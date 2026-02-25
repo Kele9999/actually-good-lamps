@@ -24,6 +24,7 @@ export default function MyState({ children }) {
   const [products, setProducts] = useState(starterProducts);
   const [cartItems, setCartItems] = useState([]);
   const [orders, setOrders] = useState([]);
+  
 
   const addToCart = (product, qty = 1) => {
     setCartItems((prev) => {
@@ -64,7 +65,6 @@ export default function MyState({ children }) {
     [cartItems]
   );
 
-  // must be AFTER cartTotal
   const placeOrder = (customer) => {
     if (cartItems.length === 0) return { ok: false, message: "Cart is empty" };
 
@@ -82,7 +82,6 @@ export default function MyState({ children }) {
     return { ok: true, orderId: newOrder.id };
   };
 
-  // ✅ IMPORTANT: products MUST be included here
   const value = {
     products,
     setProducts,
