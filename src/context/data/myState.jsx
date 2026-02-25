@@ -6,10 +6,60 @@ import { createOrder } from "../../firebase/orders";
 export default function MyState({ children }) {
  
   const [products, setProducts] = useState([]);
+  const [filters, setFilters] = useState({
+  search: "",
+  minPrice: "",
+  maxPrice: "",
+  category: "All",
+  lightQuality: "All",
+  material: "All",
+  features: [], // array
+  inStockOnly: false,
+  });
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [orders, setOrders] = useState([]);
+
+  const filteredProducts = useMemo(() => {
+  const q = filters.search.trim().toLowerCase();
+  const min = filters.minPrice === "" ? null : Number(filters.minPrice);
+  const max = filters.maxPrice === "" ? null : Number(filters.maxPrice);
+
+  return products.filter((p) => {
+    // search
+    if (q) {
+      const hay = `${p.name || ""} ${p.description || ""} ${p.category || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+
+    // price
+    const price = Number(p.price) || 0;
+    if (min !== null && price < min) return false;
+    if (max !== null && price > max) return false;
+
+    // category
+    if (filters.category !== "All" && p.category !== filters.category) return false;
+
+    // lightQuality
+    if (filters.lightQuality !== "All" && p.lightQuality !== filters.lightQuality) return false;
+
+    // material
+    if (filters.material !== "All" && p.material !== filters.material) return false;
+
+    // features
+    if (filters.features.length > 0) {
+      const feats = Array.isArray(p.features) ? p.features : [];
+      const ok = filters.features.every((f) => feats.includes(f));
+      if (!ok) return false;
+    }
+
+    // stock
+    if (filters.inStockOnly && (Number(p.stock) || 0) <= 0) return false;
+
+    return true;
+  });
+}, [products, filters]);
 
   useEffect(() => {
   const loadProducts = async () => {
@@ -117,8 +167,11 @@ export default function MyState({ children }) {
       cartTotal,
       orders,
       placeOrder,
+      filters,
+      setFilters,
+      filteredProducts,
     }),
-    [products, productsLoading, productsError, cartItems, cartCount, cartTotal, orders, placeOrder]
+    [products, productsLoading, productsError, cartItems, cartCount, cartTotal, orders, placeOrder, filters, filteredProducts]
   );
 
   return <MyContext.Provider value={value}>{children}</MyContext.Provider>;
