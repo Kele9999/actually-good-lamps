@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import MyContext from "./myContext";
 import { fetchProducts } from "../../firebase/products";
+import { createOrder } from "../../firebase/orders";
 
 export default function MyState({ children }) {
  
@@ -71,25 +72,36 @@ export default function MyState({ children }) {
   );
 
  
-  const placeOrder = useCallback((customer) => { //this is the order logic, it creates a new order and adds it to the orders state, then clears the cart.
-  if (cartItems.length === 0)
-    return { ok: false, message: "Cart is empty" };
+  const placeOrder = useCallback(
+  async (customer) => {
+    if (cartItems.length === 0) return { ok: false, message: "Cart is empty" };
 
-  const newOrder = {
-    id: `order-${Date.now()}`,
-    items: cartItems,
-    total: cartTotal,
-    customer,
-    createdAt: new Date().toISOString(),
-    status: "pending",
-  };
+    try {
+      const orderId = await createOrder({
+        items: cartItems,
+        total: cartTotal,
+        customer,
+      });
 
-  setOrders((prev) => [newOrder, ...prev]);
-  setCartItems([]);
+      // keeping this local list for the dashboard.
+      const localOrder = {
+        id: orderId,
+        items: cartItems,
+        total: cartTotal,
+        customer,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      };
+      setOrders((prev) => [localOrder, ...prev]);
 
-  return { ok: true, orderId: newOrder.id };
-}, [cartItems, cartTotal]);
-
+      setCartItems([]); // clear cart on successful order
+      return { ok: true, orderId };
+    } catch (err) {
+      return { ok: false, message: err?.message || "Failed to place order" };
+    }
+  },
+  [cartItems, cartTotal]
+);
 
   const value = useMemo(
     () => ({

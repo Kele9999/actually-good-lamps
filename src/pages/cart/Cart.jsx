@@ -1,77 +1,116 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import MyContext from "../../context/data/myContext";
 import { Link } from "react-router-dom";
 
+
 function Cart() {
-  const { cartItems, cartTotal, removeFromCart, updateQty, clearCart } =
+  const { cartItems, cartTotal, removeFromCart, updateQty, clearCart, placeOrder } =
     useContext(MyContext);
 
-  if (!cartItems || cartItems.length === 0) {
-    return (
-      <div style={{ padding: 16 }}>
-        <h1>Your Cart</h1>
-        <p>Your cart is empty.</p>
-      </div>
-    );
-  }
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
+  const [placing, setPlacing] = useState(false);
+
+  const handlePlaceOrder = async () => {
+    setStatusMsg("");
+
+    if (!name.trim() || !phone.trim() || !address.trim()) {
+      setStatusMsg("Please fill in name, phone, and address.");
+      return;
+    }
+
+    setPlacing(true);
+    const res = await placeOrder({ name, phone, address });
+    setPlacing(false);
+
+    if (!res.ok) {
+      setStatusMsg(res.message);
+      return;
+    }
+
+    setName("");
+    setPhone("");
+    setAddress("");
+    setStatusMsg(`Order placed! Order ID: ${res.orderId}`);
+  };
 
   return (
     <div style={{ padding: 16 }}>
-      <h1>Your Cart</h1>
+      <h1>Cart</h1>
 
-      {cartItems.map((item) => (
-        <div
-          key={item.id}
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            padding: 12,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            marginBottom: 12,
-          }}
-        >
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 6 }}
-          />
+      {cartItems.length === 0 ? (
+        <p>Your cart is empty.</p>
+      ) : (
+        <>
+          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {cartItems.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  border: "1px solid #ddd",
+                  padding: 12,
+                  borderRadius: 8,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <strong>{item.name}</strong>
+                  <div style={{ fontSize: 12 }}>R {item.price}</div>
+                </div>
 
-          <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0 }}>{item.name}</h3>
-            <p style={{ margin: "4px 0" }}>R {item.price}</p>
-            <p style={{ margin: 0, fontSize: 12 }}>{item.category}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => updateQty(item.id, e.target.value)}
+                    style={{ width: 70 }}
+                  />
+                  <button onClick={() => removeFromCart(item.id)}>Remove</button>
+                </div>
+              </div>
+            ))}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label style={{ fontSize: 12 }}>Qty</label>
+          <h3 style={{ marginTop: 16 }}>Total: R {cartTotal}</h3>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <button onClick={clearCart}>Clear Cart</button>
+          </div>
+
+          <hr style={{ margin: "20px 0" }} />
+
+          <h2>Checkout</h2>
+
+          <div style={{ display: "grid", gap: 10, maxWidth: 420 }}>
             <input
-              type="number"
-              min="1"
-              value={item.quantity}
-              onChange={(e) => updateQty(item.id, e.target.value)}
-              style={{ width: 60, padding: 6 }}
+              placeholder="Full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
+            <input
+              placeholder="Phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            <input
+              placeholder="Address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+
+            <button onClick={handlePlaceOrder} disabled={placing}>
+              {placing ? "Placing order..." : "Place Order"}
+            </button>
+
+            {statusMsg && <p>{statusMsg}</p>}
           </div>
-
-          <button onClick={() => removeFromCart(item.id)}>Remove</button>
-        </div>
-      ))}
-
-      <h2>Total: R {cartTotal}</h2>
-
-      <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-      <Link to="/order">
-        <button>Proceed to Checkout</button>
-      </Link>
-
-  <button onClick={clearCart}>Clear Cart</button>
-</div>
-
-      <button onClick={clearCart} style={{ marginTop: 12 }}>
-        Clear Cart
-      </button>
+        </>
+      )}
     </div>
   );
 }
