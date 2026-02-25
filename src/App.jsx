@@ -9,6 +9,8 @@ import Cart from "./pages/cart/Cart";
 import Dashboard from "./pages/administrator/dashboard/Dashboard";
 import NoPage from "./pages/nopage/NoPage";
 
+console.log("ENV TEST:", import.meta.env.VITE_FIREBASE_PROJECT_ID);
+
 function App() {
   return (
     <Router>
