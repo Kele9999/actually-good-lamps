@@ -15,18 +15,19 @@ export default function MyState({ children }) {
   material: "All",
   features: [], // array
   inStockOnly: false,
+  sort: "featured",
   });
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [orders, setOrders] = useState([]);
 
-  const filteredProducts = useMemo(() => {
+const filteredProducts = useMemo(() => {
   const q = filters.search.trim().toLowerCase();
   const min = filters.minPrice === "" ? null : Number(filters.minPrice);
   const max = filters.maxPrice === "" ? null : Number(filters.maxPrice);
 
-  return products.filter((p) => {
+  const filtered = products.filter((p) => {
     // search
     if (q) {
       const hay = `${p.name || ""} ${p.description || ""} ${p.category || ""}`.toLowerCase();
@@ -59,6 +60,27 @@ export default function MyState({ children }) {
 
     return true;
   });
+
+  // ✅ Sorting (make a copy so we don't mutate state)
+  const sorted = [...filtered];
+
+  switch (filters.sort) {
+    case "price-asc":
+      sorted.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+      break;
+    case "price-desc":
+      sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+      break;
+    case "name-asc":
+      sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+      break;
+    case "featured":
+    default:
+      // keep original order
+      break;
+  }
+
+  return sorted;
 }, [products, filters]);
 
   useEffect(() => {

@@ -157,12 +157,27 @@ function AllProducts() {
                   material: "All",
                   features: [],
                   inStockOnly: false,
+                  sort: "featured",
                 })
               }
               style={{ padding: 10, cursor: "pointer" }}
             >
               Reset
             </button>
+
+            <div>
+              <label style={{ fontSize: 12 }}>Sort</label>
+              <select
+                value={filters.sort}
+                onChange={(e) => setFilters((p) => ({ ...p, sort: e.target.value }))}
+                style={{ width: "100%", padding: 8 }}
+              >
+                <option value="featured">Featured</option>
+                <option value="price-asc">Price: Low → High</option>
+                <option value="price-desc">Price: High → Low</option>
+                <option value="name-asc">Name: A → Z</option>
+              </select>
+            </div>
           </div>
         </aside>
 
