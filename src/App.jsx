@@ -11,7 +11,7 @@ import Order from "./pages/order/Order";
 import Cart from "./pages/cart/Cart";
 import Dashboard from "./pages/administrator/dashboard/Dashboard";
 import NoPage from "./pages/nopage/NoPage";
-
+import Wishlist from "./pages/wishlist/Wishlist";
 
 function App() {
 
@@ -28,6 +28,7 @@ function App() {
           <Route path="signup" element={<Signup />} />
           <Route path="dashboard"element={<RequireAdmin> <Dashboard /> </RequireAdmin>} />
           <Route path="order" element={<RequireAuth><Order /></RequireAuth>} />
+          <Route path="wishlist" element={<Wishlist />} />
         </Route>
       </Routes>
     </Router>

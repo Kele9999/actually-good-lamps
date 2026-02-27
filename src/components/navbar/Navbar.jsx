@@ -1,11 +1,13 @@
 import { useContext } from "react";
-import { Link, useNavigate} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 import { FiShoppingCart } from "react-icons/fi";
 
 function Navbar() {
-  const { user, role, logout, cartCount } = useContext(MyContext);
+  const { user, role, logout, cartCount, wishlistItems } = useContext(MyContext);
   const navigate = useNavigate();
+
+  const isAdmin = role === "admin";
 
   const handleLogout = async () => {
     await logout();
@@ -23,7 +25,7 @@ function Navbar() {
         }}
       >
         <Link
-          to="/"
+          to={isAdmin ? "/dashboard" : "/"}
           style={{
             fontWeight: 700,
             fontSize: 20,
@@ -35,42 +37,57 @@ function Navbar() {
         </Link>
 
         <nav style={{ display: "flex", gap: 20, alignItems: "center" }}>
-  <Link to="/products">Shop</Link>
+          {/* ✅ Customer and Guest nav */}
+          {!isAdmin && (
+            <>
+              <Link to="/products">Shop</Link>
 
-  <Link
-    to="/cart"
-    style={{ display: "flex", alignItems: "center", gap: 6 }}
-  >
-    <FiShoppingCart /> Cart ({cartCount})
-  </Link>
+              <Link to="/wishlist">
+                Wishlist ({wishlistItems?.length ?? 0})
+              </Link>
 
-  {/* the dashboard only shows when an admin is logged in */}
-  {role === "admin" && <Link to="/dashboard"> Dashboard </Link>}
+              <Link
+                to="/cart"
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <FiShoppingCart /> Cart ({cartCount})
+              </Link>
+            </>
+          )}
 
-  {/* Authentication section */}
-  {!user ? (
-    <>
-      <Link to="/login">Login</Link>
-      <Link to="/signup">Sign up</Link>
-    </>
-  ) : (
-    <>
-      <span style={{ fontSize: 12, opacity: 0.8 }}>{user.email}</span>
-      <button
-        onClick={handleLogout}
-        style={{
-          border: "1px solid #ddd",
-          padding: "6px 10px",
-          borderRadius: 8,
-          background: "white",
-          cursor: "pointer",
-        }}
-      >
-        Logout
-      </button>
-    </>
-  )}
-</nav>
+          {/* ✅ Admin nav*/}
+          {isAdmin && (
+            <>
+              <Link to="/dashboard">Dashboard</Link>
+              <Link to="/analytics">Analytics</Link>
+              <Link to="/admin/products">Manage</Link>
+            </>
+          )}
+
+          {/* ✅ Authentication */}
+          {!user ? (
+            <>
+              <Link to="/login">Login</Link>
+              <Link to="/signup">Sign up</Link>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 12, opacity: 0.8 }}>{user.email}</span>
+              <button
+                onClick={handleLogout}
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Logout
+              </button>
+            </>
+          )}
+        </nav>
       </div>
     </header>
   );

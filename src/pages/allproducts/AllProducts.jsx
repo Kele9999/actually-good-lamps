@@ -12,6 +12,8 @@ function AllProducts() {
   cartCount,
   productsLoading,
   productsError,
+  toggleWishlist,
+  wishlistIds,
 } = useContext(MyContext);
 
   return (
@@ -26,7 +28,7 @@ function AllProducts() {
 
     {!productsLoading && !productsError && (
       <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 16, alignItems: "start" }}>
-        {/* LEFT SIDEBAR */}
+        {/* Left sidebar */}
         <aside
           style={{
             border: "1px solid #ddd",
@@ -181,7 +183,7 @@ function AllProducts() {
           </div>
         </aside>
 
-        {/* RIGHT GRID */}
+        {/* right grid */}
         <section>
           {filteredProducts.length === 0 ? (
             <p>No products match your filters.</p>
@@ -208,6 +210,14 @@ function AllProducts() {
                   >
                     {(Number(p.stock) || 0) <= 0 ? "Out of stock" : "Add to cart"}
                   </button>
+
+                  <button
+                    onClick={() => toggleWishlist(p)}
+                    style={{ cursor: "pointer", marginLeft: 8 }}
+                  >
+                    {wishlistIds.has(p.id) ? "♥ Saved" : "♡ Save"}
+                </button>
+
                 </div>
               ))}
             </div>
