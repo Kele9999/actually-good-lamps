@@ -600,6 +600,54 @@ const addCategory = useCallback(
   }, [products, filters]);
 
 
+  const aiSearch = async (query) => {
+  const base = import.meta.env.DEV
+    ? "http://127.0.0.1:5001/actually-good-lamps/us-central1"
+    : "https://us-central1-actually-good-lamps.cloudfunctions.net";
+
+  const url = `${base}/aiTextSearch`;
+
+  console.log("AI SEARCH ->", { url, query });
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    const txt = await res.text();
+    console.log("AI SEARCH raw text:", txt);
+    throw new Error("Function did not return JSON");
+  }
+
+  console.log("AI SEARCH response:", { status: res.status, data });
+
+  if (!res.ok) {
+    throw new Error(data?.message || `Function error (${res.status})`);
+  }
+
+  const parsed = data?.result?.parsed || data?.parsed || data || {};
+
+  const next = {
+    search: parsed.search ?? query ?? "",
+    minPrice: parsed.minPrice ?? "",
+    maxPrice: parsed.maxPrice ?? "",
+    category: parsed.category ?? "All",
+    lightQuality: parsed.lightQuality ?? "All",
+    material: parsed.material ?? "All",
+    features: Array.isArray(parsed.features) ? parsed.features : [],
+    inStockOnly: Boolean(parsed.inStockOnly ?? false),
+    sort: "featured",
+  };
+
+  setFilters((p) => ({ ...p, ...next }));
+  return { ok: true, data };
+};
+
   // Context value
   
   const value = useMemo(
@@ -653,6 +701,9 @@ const addCategory = useCallback(
       wishlistItems,
       wishlistIds,
       toggleWishlist,
+
+      // ai search
+      aiSearch,
     }),
     [
       products,
