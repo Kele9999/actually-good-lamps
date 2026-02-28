@@ -4,6 +4,7 @@ import MyContext from "./myContext";
 import { fetchProducts } from "../../firebase/products";
 import { auth, db } from "../../firebase/firebase";
 
+
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -20,6 +21,8 @@ import {
   addDoc,
   deleteDoc,
   getDocs,
+  query,
+  where,
   updateDoc,
   onSnapshot,
 } from "firebase/firestore";
@@ -266,14 +269,14 @@ return Array.from(map.values());
 
   useEffect(() => {
   try {
-    // 1) If logged out: load guest cart from sessionStorage
+    // 1) If user is logged out: load guest cart from sessionStorage
     if (!user) {
       const guestCart = JSON.parse(sessionStorage.getItem(CART_KEY_GUEST) || "[]");
       setCartItems(guestCart);
       return;
     }
 
-    // 2) If logged in: merge guest cart -> user cart (localStorage)
+    // 2) If user islogged in: merge guest cart -> user cart (localStorage)
     const guestCart = JSON.parse(sessionStorage.getItem(CART_KEY_GUEST) || "[]");
     const userKey = CART_KEY_USER(user.uid);
     const userCart = JSON.parse(localStorage.getItem(userKey) || "[]");
@@ -290,7 +293,7 @@ return Array.from(map.values());
     setCartItems(merged);
   } catch (e) {
     console.error("Failed to load/merge cart:", e);
-    setCartItems([]); // safe fallback
+    setCartItems([]); // if there is an error, we start with an empty cart to avoid blocking the user with a broken cart state
   }
 }, [user]);
 
@@ -372,9 +375,7 @@ return Array.from(map.values());
     try {
       const snap = await getDocs(collection(db, "categories"));
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) =>
-        String(a.name || "").localeCompare(String(b.name || ""))
-      );
+      list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
       setCategories(list);
     } catch (e) {
       console.error(e);
@@ -382,27 +383,41 @@ return Array.from(map.values());
     }
   }, []);
 
-  const addCategory = useCallback(
-    async (name) => {
-      const clean = name.trim();
-      if (!clean) return;
+const addCategory = useCallback(
+  async (name) => {
+    const clean = name.trim();
+    if (!clean) return;
 
-      setAdminLoading(true);
-      setAdminError("");
-      try {
-        await addDoc(collection(db, "categories"), {
-          name: clean,
-          createdAt: serverTimestamp(),
-        });
-        await fetchCategories();
-      } catch (e) {
-        setAdminError(e?.message || "Failed to add category");
-      } finally {
-        setAdminLoading(false);
+    const lower = clean.toLowerCase();
+
+    setAdminLoading(true);
+    setAdminError("");
+
+    try {
+      // check for duplicate category (case-insensitive) before adding
+      const q = query(collection(db, "categories"), where("nameLower", "==", lower));
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        setAdminError("That category already exists.");
+        return;
       }
-    },
-    [fetchCategories]
-  );
+
+      await addDoc(collection(db, "categories"), {
+        name: clean,
+        nameLower: lower,
+        createdAt: serverTimestamp(),
+      });
+
+      await fetchCategories();
+    } catch (e) {
+      setAdminError(e?.message || "Failed to add category");
+    } finally {
+      setAdminLoading(false);
+    }
+  },
+  [fetchCategories]
+);
 
   const updateCategory = useCallback(
     async (id, name) => {
@@ -440,7 +455,7 @@ return Array.from(map.values());
   );
 
 
-  // Admin crud for products (add, update, delete) - note: we don't refetch products after these actions; instead we rely on realtime updates from Firestore to keep the UI in sync. This is more efficient and provides instant feedback in the admin dashboard. However, it does mean that any Firestore errors won't be reflected in the UI immediately.
+  // Admin crud for products (add, update, delete). We don't refetch products after these actions; instead we rely on realtime updates from Firestore to keep the UI in sync. This is more efficient and provides instant feedback in the admin dashboard. However, it does mean that any Firestore errors won't be reflected in the UI immediately.
  
   const addProduct = async (product) => {
     setAdminLoading(true);
@@ -461,20 +476,22 @@ return Array.from(map.values());
   };
 
   const updateProduct = async (id, updates) => {
-    setAdminLoading(true);
-    setAdminError("");
-    try {
-      await updateDoc(doc(db, "products", id), {
-        ...updates,
-        tags: updates.tags || [],
-        updatedAt: serverTimestamp(),
-      });
-    } catch (e) {
-      setAdminError(e?.message || "Failed to update product");
-    } finally {
-      setAdminLoading(false);
-    }
-  };
+  setAdminLoading(true);
+  setAdminError("");
+
+  try {
+    await updateDoc(doc(db, "products", id), {
+      ...updates,
+      // only include tags field if it's an array (to avoid overwriting with invalid data)
+      ...(Array.isArray(updates.tags) ? { tags: updates.tags } : {}),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (e) {
+    setAdminError(e?.message || "Failed to update product");
+  } finally {
+    setAdminLoading(false);
+  }
+};
 
   const deleteProduct = async (id) => {
     setAdminLoading(true);
@@ -504,6 +521,7 @@ return Array.from(map.values());
       const id = product.id;
 
       // Guest user: session wishlist
+
       if (!user) {
         setGuestWishlist((prev) => {
           const exists = prev.find((p) => p.id === id);
@@ -514,6 +532,7 @@ return Array.from(map.values());
       }
 
       // Logged in user: Firestore wishlist
+
       const saved = wishlistIds.has(id);
       if (saved) {
         await removeWishlistItem(user.uid, id);
@@ -544,7 +563,8 @@ return Array.from(map.values());
       if (min !== null && price < min) return false;
       if (max !== null && price > max) return false;
 
-      if (filters.category !== "All" && p.category !== filters.category) return false;
+      const cat = p.categoryName || p.category || "";
+      if (filters.category !== "All" && cat !== filters.category) return false;
       if (filters.lightQuality !== "All" && p.lightQuality !== filters.lightQuality) return false;
       if (filters.material !== "All" && p.material !== filters.material) return false;
 
@@ -608,7 +628,7 @@ return Array.from(map.values());
       orders,
       ordersLoading,
 
-      // auth
+      // authentication
       user,
       role,
       authLoading,
@@ -628,7 +648,8 @@ return Array.from(map.values());
       adminLoading,
       adminError,
 
-      // wishlist (use wishlistItems in UI)
+      // wishlist (use wishlistItems in components to get correct list based on auth state) 
+
       wishlistItems,
       wishlistIds,
       toggleWishlist,
