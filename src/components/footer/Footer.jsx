@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-/* ── Styles ── */
+/* Styles  */
 if (!document.getElementById("agl-footer-style")) {
   const style = document.createElement("style");
   style.id = "agl-footer-style";
@@ -11,7 +11,7 @@ if (!document.getElementById("agl-footer-style")) {
       font-family: var(--font-body);
     }
 
-    /* ── Main footer grid ── */
+    /* Main footer grid */
     .agl-footer-main {
       display: grid;
       grid-template-columns: 2fr 1fr 1fr 1fr;
@@ -48,7 +48,7 @@ if (!document.getElementById("agl-footer-style")) {
       margin-bottom: 32px;
     }
 
-    /* Social icons */
+    /* Socials icons */
     .agl-footer-socials {
       display: flex;
       gap: 12px;
@@ -101,7 +101,7 @@ if (!document.getElementById("agl-footer-style")) {
       color: var(--whiskey);
     }
 
-    /* ── Newsletter strip ── */
+    /* Newsletter strip */
     .agl-footer-newsletter {
       border-top: 1px solid rgba(211,152,88,0.08);
       border-bottom: 1px solid rgba(211,152,88,0.08);
@@ -165,7 +165,7 @@ if (!document.getElementById("agl-footer-style")) {
     }
     .agl-footer-nl-btn:hover { background: var(--champagne); }
 
-    /* ── Bottom bar ── */
+    /* Bottom bar */
     .agl-footer-bottom {
       padding: 24px 64px;
       max-width: 1400px;
@@ -201,7 +201,7 @@ if (!document.getElementById("agl-footer-style")) {
     }
     .agl-footer-bottom-link:hover { opacity: 0.6; }
 
-    /* ── Decorative quote strip ── */
+    /* quote strip  */
     .agl-footer-quote {
       padding: 0 64px 0;
       max-width: 1400px;
@@ -248,10 +248,10 @@ export default function Footer() {
   return (
     <footer className="agl-footer">
 
-      {/* ── Main columns ── */}
+      {/* Main columns */}
       <div className="agl-footer-main">
 
-        {/* Brand */}
+        {/* Brand*/}
         <div>
           <div className="agl-footer-brand-name">AGL</div>
           <div className="agl-footer-brand-tag">Actually Good Lamps · South Africa</div>
@@ -299,7 +299,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Info */}
+        {/* Store Information */}
         <div>
           <span className="agl-footer-col-title">Information</span>
           <div className="agl-footer-links">
@@ -330,7 +330,7 @@ export default function Footer() {
 
       </div>
 
-      {/* ── Newsletter ── */}
+      {/* Newsletter */}
       <div className="agl-footer-newsletter">
         <div className="agl-footer-nl-left">
           <div className="agl-footer-nl-title">
@@ -350,7 +350,7 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* ── Decorative quote ── */}
+      {/* quote */}
       <div className="agl-footer-quote">
         <div className="agl-footer-quote-line" />
         <span className="agl-footer-quote-text">
@@ -359,7 +359,7 @@ export default function Footer() {
         <div className="agl-footer-quote-line" />
       </div>
 
-      {/* ── Bottom bar ── */}
+      {/* Bottom bar  */}
       <div className="agl-footer-bottom">
         <span className="agl-footer-copy">
           © {new Date().getFullYear()} <em>Actually Good Lamps</em>. All rights reserved. Crafted in South Africa.

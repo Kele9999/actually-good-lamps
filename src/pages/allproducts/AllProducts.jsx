@@ -2,7 +2,7 @@ import { useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 
-/* ── Google Fonts injected once ── */
+/* Google Fonts */
 if (!document.getElementById("agl-fonts")) {
   const link = document.createElement("link");
   link.id = "agl-fonts";
@@ -12,7 +12,7 @@ if (!document.getElementById("agl-fonts")) {
   document.head.appendChild(link);
 }
 
-/* ── Styles injected once ── */
+/* Styles */
 if (!document.getElementById("agl-allproducts-style")) {
   const style = document.createElement("style");
   style.id = "agl-allproducts-style";
@@ -418,6 +418,7 @@ export default function AllProducts() {
         <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "20px", alignItems: "start" }}>
 
           {/* Sidebar */}
+
           <aside className="agl-sidebar">
             <h3>Refine</h3>
 
@@ -552,6 +553,7 @@ export default function AllProducts() {
           </aside>
 
           {/* Grid */}
+
           <section>
             <div className="agl-grid">
               {listToShow.length === 0 ? (

@@ -2,7 +2,8 @@ import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 
-/* ── Fonts ── */
+/* Fonts */
+
 if (!document.getElementById("agl-fonts")) {
   const link = document.createElement("link");
   link.id = "agl-fonts";
@@ -12,7 +13,8 @@ if (!document.getElementById("agl-fonts")) {
   document.head.appendChild(link);
 }
 
-/* ── Styles ── */
+/* Styles */
+
 if (!document.getElementById("agl-home-style")) {
   const style = document.createElement("style");
   style.id = "agl-home-style";
@@ -29,7 +31,8 @@ if (!document.getElementById("agl-home-style")) {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--balsamico); color: var(--champagne); font-family: var(--font-body); overflow-x: hidden; }
 
-    /* HERO */
+    /* Hero */
+
     .hp-hero {
       min-height: 100vh;
       display: flex;
@@ -75,6 +78,7 @@ if (!document.getElementById("agl-home-style")) {
     .hp-divider-line { width: 44px; height: 1px; background: var(--whiskey); opacity: 0.35; margin: 36px auto; }
 
     /* Search */
+
     .hp-search-wrap { width: 100%; max-width: 580px; position: relative; z-index: 1; }
     .hp-search-label { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--whiskey); opacity: 0.55; display: block; margin-bottom: 12px; }
     .hp-search-row {
@@ -116,6 +120,7 @@ if (!document.getElementById("agl-home-style")) {
     .hp-search-ok  { font-size: 11px; color: var(--whiskey); margin-top: 10px; font-style: italic; opacity: 0.8; }
 
     /* Scroll hint */
+
     .hp-scroll-hint {
       position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
       display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -127,7 +132,8 @@ if (!document.getElementById("agl-home-style")) {
       50%       { transform: translateX(-50%) translateY(7px); }
     }
 
-    /* ABOUT */
+    /* About */
+
     .hp-about { background: var(--burnt); padding: 100px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
     .hp-about-eyebrow { font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--whiskey); opacity: 0.65; margin-bottom: 20px; }
     .hp-about-title { font-family: var(--font-display); font-size: clamp(34px, 4vw, 54px); font-weight: 300; line-height: 1.1; color: var(--champagne); margin-bottom: 28px; }
@@ -139,7 +145,8 @@ if (!document.getElementById("agl-home-style")) {
     .hp-stat-num { font-family: var(--font-display); font-size: 48px; font-weight: 300; color: var(--whiskey); line-height: 1; }
     .hp-stat-label { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--champagne); opacity: 0.38; margin-top: 8px; }
 
-    /* SHOP THE LIGHT */
+    /* Shop the light */
+
     .hp-stl { background: var(--balsamico); padding: 100px 0; }
     .hp-stl-header { padding: 0 64px 52px; display: flex; align-items: flex-end; justify-content: space-between; }
     .hp-stl-title { font-family: var(--font-display); font-size: clamp(44px, 6vw, 82px); font-weight: 300; line-height: 0.95; color: var(--champagne); }
@@ -169,7 +176,8 @@ if (!document.getElementById("agl-home-style")) {
     .hp-stl-shop-link:hover { gap: 14px; }
     .hp-stl-shop-link::after { content: '→'; }
 
-    /* FINAL CTA */
+    /* Fical call to action */
+
     .hp-cta { background: var(--burnt); padding: 120px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; position: relative; overflow: hidden; }
     .hp-cta::before {
       content: ''; position: absolute; top: -120px; right: -120px;
@@ -251,7 +259,8 @@ export default function HomePage() {
   return (
     <div style={{ background: "var(--balsamico)" }}>
 
-      {/* ══ HERO ══ */}
+      {/* Hero Section */}
+
       <section className="hp-hero">
         <p className="hp-eyebrow">Actually Good Lamps &nbsp;·&nbsp; South Africa</p>
 
@@ -304,7 +313,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ ABOUT ══ */}
+      {/* About */}
+
       <section className="hp-about">
         <div>
           <p className="hp-about-eyebrow">Our philosophy</p>
@@ -343,7 +353,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ SHOP THE LIGHT ══ */}
+      {/* Shop the light */}
+
       <section className="hp-stl">
         <div className="hp-stl-header">
           <h2 className="hp-stl-title">Shop<br />the <em>Light</em></h2>
@@ -356,7 +367,11 @@ export default function HomePage() {
         <div className="hp-stl-grid">
           <div className="hp-stl-left">
             <div className="hp-stl-cell hp-stl-cell-tall" onClick={() => navigate("/products")}>
-              <div className="hp-stl-cell-bg" style={{ background: "linear-gradient(145deg, #2e1208 0%, #150C0C 100%)" }}>
+              <div className="hp-stl-cell-bg" style={{
+                    backgroundImage: "linear-gradient(to bottom, rgba(21,12,12,0.3), rgba(21,12,12,0.6)), url('https://firebasestorage.googleapis.com/v0/b/actually-good-lamps.firebasestorage.app/o/20260301_1554_Elegant%20Living%20Room_simple_compose_01kjmttnm8f4bracsqqgzmfdap.png?alt=media&token=4c7a84a2-64eb-4f0a-9167-eb9eb7793b21')",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}>
                 <span style={{ fontFamily: "var(--font-display)", fontSize: 90, opacity: 0.05, color: "var(--whiskey)" }}>◎</span>
               </div>
               <div className="hp-stl-cell-overlay">
@@ -366,7 +381,11 @@ export default function HomePage() {
               </div>
             </div>
             <div className="hp-stl-cell hp-stl-cell-short" onClick={() => navigate("/products")}>
-              <div className="hp-stl-cell-bg" style={{ background: "linear-gradient(145deg, #1e0e07 0%, #34150F 100%)" }}>
+              <div className="hp-stl-cell-bg" style={{
+                    backgroundImage: "linear-gradient(to bottom, rgba(21,12,12,0.3), rgba(21,12,12,0.6)), url('https://firebasestorage.googleapis.com/v0/b/actually-good-lamps.firebasestorage.app/o/20260301_1610_Image%20Generation_simple_compose_01kjmvrcsqf1z8f58dg6j2j395.png?alt=media&token=5914f929-782b-40ba-8885-2fd217a08ef5')",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}>
                 <span style={{ fontFamily: "var(--font-display)", fontSize: 70, opacity: 0.06, color: "var(--champagne)" }}>✦</span>
               </div>
               <div className="hp-stl-cell-overlay">
@@ -378,7 +397,11 @@ export default function HomePage() {
           </div>
 
           <div className="hp-stl-cell hp-stl-cell-feature" onClick={() => navigate("/products")}>
-            <div className="hp-stl-cell-bg" style={{ background: "linear-gradient(160deg, #3a1a0a 0%, #150C0C 55%, #34150F 100%)" }}>
+            <div className="hp-stl-cell-bg" style={{
+                  backgroundImage: "linear-gradient(to bottom, rgba(21,12,12,0.3), rgba(21,12,12,0.6)), url('https://firebasestorage.googleapis.com/v0/b/actually-good-lamps.firebasestorage.app/o/20260301_1600_Image%20Generation_simple_compose_01kjmv6dfvey7rfvm93jeekrx5.png?alt=media&token=e956c971-eb66-4697-83cb-99f5ec0dfe85')",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}>
               <span style={{ fontFamily: "var(--font-display)", fontSize: 160, opacity: 0.04, color: "var(--whiskey)" }}>☽</span>
             </div>
             <div className="hp-stl-cell-overlay" style={{ padding: "48px 36px 32px" }}>
@@ -390,7 +413,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══ FINAL CTA ══ */}
+      {/* Last call to action */}
+
       <section className="hp-cta">
         <div className="hp-cta-left">
           <p className="hp-cta-eyebrow">The AGL difference</p>

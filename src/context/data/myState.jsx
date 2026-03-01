@@ -26,7 +26,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// Helpers 
 
 function getFunctionsBaseUrl() {
   const customBase = String(import.meta.env.VITE_FUNCTIONS_BASE_URL || "").trim();
@@ -51,21 +51,24 @@ function fileToDataUrl(file) {
   });
 }
 
-// ─── MyState ────────────────────────────────────────────────────────────────
+// MyState - provides global state and actions to the app
 
 export default function MyState({ children }) {
 
-  // ── Auth ──
+  // Authentication
+
   const [user, setUser] = useState(null);
   const [role, setRole] = useState("guest");
   const [authLoading, setAuthLoading] = useState(true);
 
-  // ── Products ──
+  // Products
+
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
 
-  // ── Filters ──
+  // Filters
+
   const [filters, setFilters] = useState({
     search: "",
     minPrice: "",
@@ -78,7 +81,8 @@ export default function MyState({ children }) {
     sort: "featured",
   });
 
-  // ── AI Search ──
+  // AI Search
+
   const [aiQuery, setAiQuery] = useState("");
   const [aiResultIds, setAiResultIds] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -91,7 +95,8 @@ export default function MyState({ children }) {
     setAiLoading(false);
   }, []);
 
-  // ── Cart ──
+  // Cart
+
   const [cartItems, setCartItems] = useState([]);
 
   const cartStorageKey = useMemo(() => {
@@ -115,7 +120,8 @@ export default function MyState({ children }) {
     }
   }, [cartItems, cartStorageKey]);
 
-  // ── Admin ──
+  //  Admin
+
   const [categories, setCategories] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
@@ -123,10 +129,12 @@ export default function MyState({ children }) {
   const [ordersLoading, setOrdersLoading] = useState(true);
 
   // User order history (for customer role)
+
   const [userOrders, setUserOrders] = useState([]);
   const [userOrdersLoading, setUserOrdersLoading] = useState(false);
 
-  // ── Wishlist ──
+  // Wishlist
+
   const GUEST_WISHLIST_KEY = "agl_guest_wishlist_v1";
   const [guestWishlist, setGuestWishlist] = useState(() => {
     try {
@@ -146,7 +154,8 @@ export default function MyState({ children }) {
 
   const [wishlist, setWishlist] = useState([]);
 
-  // ── Auth listener ──
+  // Authentication listener 
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -182,7 +191,7 @@ export default function MyState({ children }) {
     return () => unsub();
   }, []);
 
-  // ── User orders listener ──
+  // User orders listener
 
   useEffect(() => {
   if (!user) { setUserOrders([]); return; }
@@ -204,7 +213,8 @@ export default function MyState({ children }) {
   return () => unsub();
 }, [user]);
 
-  // ── Wishlist listener ──
+  //  Wishlist listener
+
   useEffect(() => {
     if (!user) {
       setWishlist([]);
@@ -260,7 +270,8 @@ export default function MyState({ children }) {
     [user, wishlistIds],
   );
 
-  // ── Products load ──
+  // Products load 
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -277,7 +288,8 @@ export default function MyState({ children }) {
     load();
   }, []);
 
-  // ── Filtered products ──
+  // Filtered products 
+
   const filteredProducts = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     const min = filters.minPrice === "" ? null : Number(filters.minPrice);
@@ -339,14 +351,16 @@ export default function MyState({ children }) {
     return sorted;
   }, [products, filters]);
 
-  // ── AI results → real products ──
+  //  AI search results - 
+
   const aiResultsProducts = useMemo(() => {
     if (!aiResultIds.length) return [];
     const map = new Map(products.map((p) => [p.id, p]));
     return aiResultIds.map((id) => map.get(id)).filter(Boolean);
   }, [aiResultIds, products]);
 
-  // ── AI text search ──
+  // AI text search 
+
   const aiSearch = useCallback(async (query) => {
     const q = String(query || "").trim();
     if (!q) return { ok: false, message: "Missing query" };
@@ -385,7 +399,8 @@ export default function MyState({ children }) {
     }
   }, []);
 
-  // ── AI image search ──
+  // AI image search 
+
   const aiImageSearch = useCallback(async (file, query = "") => {
     if (!file) return { ok: false, message: "Missing image file" };
     if (!String(file.type || "").startsWith("image/"))
@@ -435,13 +450,13 @@ export default function MyState({ children }) {
       body: JSON.stringify({ prompt }),
     });
     const data = await res.json();
-    return data; // { ok: true, product: {...} } or { ok: false, message: "..." }
+    return data; 
   } catch (e) {
     return { ok: false, message: e?.message || "Network error" };
   }
 }, []);
 
-  // ── Cart actions ──
+  // Cart actions 
   const addToCart = useCallback((product, qty = 1) => {
     setCartItems((prev) => {
       const exists = prev.find((item) => item.id === product.id);
@@ -479,7 +494,8 @@ export default function MyState({ children }) {
     [cartItems],
   );
 
-  // ── Orders ──
+  // Orders
+
   useEffect(() => {
     if (role !== "admin") return;
 
@@ -515,7 +531,8 @@ export default function MyState({ children }) {
     [user, cartItems, cartTotal],
   );
 
-  // ── Auth actions ──
+  // Authentication actions
+
   const signup = useCallback(async (email, password) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await setDoc(doc(db, "users", cred.user.uid), {
@@ -535,7 +552,8 @@ export default function MyState({ children }) {
     await signOut(auth);
   }, []);
 
-  // ── Admin: Categories ──
+  //  Admin: Categories
+
   const fetchCategories = useCallback(async () => {
     setAdminError("");
     try {
@@ -600,7 +618,8 @@ export default function MyState({ children }) {
     [fetchCategories],
   );
 
-  // ── Admin: Products ──
+  // Admin: Products
+
   const addProduct = useCallback(async (product) => {
     setAdminLoading(true);
     setAdminError("");
@@ -649,7 +668,8 @@ export default function MyState({ children }) {
     }
   }, []);
 
-  // ── Context value ──
+  // Context value
+
   const value = useMemo(
     () => ({
       // auth

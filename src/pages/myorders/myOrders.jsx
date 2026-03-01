@@ -64,6 +64,8 @@ if (!document.getElementById("agl-myorders-style")) {
   document.head.appendChild(style);
 }
 
+// Status mappings for display
+
 const STATUS_CLS   = { pending_payment: "mo-pending", complete: "mo-complete", cancelled: "mo-cancelled" };
 const STATUS_LABEL = { pending_payment: "Pending", complete: "Complete", cancelled: "Cancelled" };
 

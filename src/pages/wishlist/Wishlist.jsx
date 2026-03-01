@@ -2,7 +2,8 @@ import { useContext } from "react";
 import { Link } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 
-/* ── Styles ── */
+/* Styles */
+
 if (!document.getElementById("agl-wishlist-style")) {
   const style = document.createElement("style");
   style.id = "agl-wishlist-style";
@@ -208,6 +209,7 @@ export default function Wishlist() {
       </div>
 
       {/* Guest notice */}
+
       {!user && (
         <div className="wl-guest-note">
           You're browsing as a guest — your saved lamps will be lost when you close this tab.{" "}

@@ -28,7 +28,7 @@ function App() {
           <Route path="signup" element={<Signup />} />
           <Route path="dashboard"element={<RequireAdmin> <Dashboard /> </RequireAdmin>} />
           <Route path="wishlist" element={<Wishlist />} />
-          <Route path="myorders" element={<MyOrders />} />
+          <Route path="my-orders" element={<MyOrders />} />
         </Route>
       </Routes>
     </Router>

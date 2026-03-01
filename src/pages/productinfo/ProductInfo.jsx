@@ -2,7 +2,8 @@ import { useContext, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 
-/* ── Styles ── */
+/* Styles */
+
 if (!document.getElementById("agl-product-style")) {
   const style = document.createElement("style");
   style.id = "agl-product-style";
@@ -36,7 +37,8 @@ if (!document.getElementById("agl-product-style")) {
       min-height: 85vh;
     }
 
-    /* ── Image side ── */
+    /* Image side */
+
     .pi-img-side {
       position: relative;
       background: #1e0f0a;
@@ -73,7 +75,8 @@ if (!document.getElementById("agl-product-style")) {
       border-radius: 1px;
     }
 
-    /* ── Info side ── */
+    /* Information side */
+
     .pi-info-side {
       background: var(--burnt);
       padding: 56px 52px 56px 56px;
@@ -131,6 +134,7 @@ if (!document.getElementById("agl-product-style")) {
     }
 
     /* Specs grid */
+
     .pi-specs {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -176,6 +180,7 @@ if (!document.getElementById("agl-product-style")) {
     }
 
     /* Qty + actions */
+
     .pi-actions { display: flex; flex-direction: column; gap: 12px; }
 
     .pi-qty-row { display: flex; align-items: center; gap: 16px; }
@@ -269,6 +274,7 @@ if (!document.getElementById("agl-product-style")) {
     @keyframes pi-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 0.8; } }
 
     /* Not found */
+
     .pi-not-found {
       min-height: 60vh;
       display: flex;
@@ -343,7 +349,8 @@ export default function ProductInfo() {
 
       <div className="pi-layout">
 
-        {/* ── Image ── */}
+        {/* Image */}
+
         <div className="pi-img-side">
           {product.imageUrl ? (
             <img className="pi-img" src={product.imageUrl} alt={product.name} />
@@ -364,7 +371,8 @@ export default function ProductInfo() {
           </div>
         </div>
 
-        {/* ── Info ── */}
+        {/* Product Information */}
+
         <div className="pi-info-side">
 
           <p className="pi-eyebrow">
@@ -383,7 +391,8 @@ export default function ProductInfo() {
 
           <div className="pi-divider" />
 
-          {/* Specs */}
+          {/* Specifications */}
+
           <div className="pi-specs">
             {product.material && (
               <div className="pi-spec">
@@ -414,6 +423,7 @@ export default function ProductInfo() {
           </div>
 
           {/* Feature tags */}
+
           {features.length > 0 && (
             <div className="pi-features">
               {features.map((f) => (
@@ -428,6 +438,7 @@ export default function ProductInfo() {
           <div className="pi-divider" />
 
           {/* Qty + actions */}
+          
           <div className="pi-actions">
             <div className="pi-qty-row">
               <span className="pi-qty-label">Qty</span>

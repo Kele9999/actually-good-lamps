@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 /* eslint-disable require-jsdoc */
-require("dotenv").config();
+require("dotenv").config(); 
 
 const { onRequest } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -15,7 +15,7 @@ const db = admin.firestore();
 const corsHandler = cors({ origin: true });
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// -------- Utilities --------
+// Helper functions
 
 function enforcePost(req, res) {
   if (req.method !== "POST") {
@@ -103,18 +103,21 @@ function simpleRankFallback(products, query) {
     .map((x) => x.id);
 }
 
-// -------- Ping --------
+// Ping function to verify Groq key is loaded and working
 
-exports.pingGroqKey = onRequest({ maxInstances: 10, secrets: ["GROQ_API_KEY"] }, (req, res) => {
-  corsHandler(req, res, () => {
-    res.json({
-      ok: Boolean(GROQ_API_KEY),
-      message: GROQ_API_KEY ? "Groq key loaded ✅" : "Groq key missing ❌",
+exports.pingGroqKey = onRequest(
+  { maxInstances: 10, secrets: ["GROQ_API_KEY"] },
+  (req, res) => {
+    corsHandler(req, res, () => {
+      res.json({
+        ok: Boolean(GROQ_API_KEY),
+        message: GROQ_API_KEY ? "Groq key loaded ✅" : "Groq key missing ❌",
+      });
     });
-  });
-});
+  },
+);
 
-// -------- AI TEXT SEARCH --------
+// AI Text Search
 
 exports.aiProductSearch = onRequest(
   { maxInstances: 10, secrets: ["GROQ_API_KEY"] },
@@ -124,7 +127,9 @@ exports.aiProductSearch = onRequest(
         if (!enforcePost(req, res)) return;
 
         if (!GROQ_API_KEY)
-          return res.status(500).json({ ok: false, message: "Missing GROQ_API_KEY" });
+          return res
+            .status(500)
+            .json({ ok: false, message: "Missing GROQ_API_KEY" });
 
         const query = req.body?.query;
         if (!query)
@@ -134,12 +139,12 @@ exports.aiProductSearch = onRequest(
         const catalog = compactCatalog(products);
 
         const system = `
-You are a product search engine for an online lamp store.
-Return ONLY valid JSON:
-{ "ids": ["<productId>"], "reason": "optional" }
-Catalog:
-${JSON.stringify(catalog)}
-`.trim();
+        You are a product search engine for an online lamp store.
+        Return ONLY valid JSON:
+        { "ids": ["<productId>"], "reason": "optional" }
+        Catalog:
+        ${JSON.stringify(catalog)}
+        `.trim();
 
         const data = await groqChat({
           model: "llama-3.1-8b-instant",
@@ -181,10 +186,10 @@ ${JSON.stringify(catalog)}
         return res.status(500).json({ ok: false, message: e.message });
       }
     });
-  }
+  },
 );
 
-// -------- AI IMAGE SEARCH --------
+// AI Image Search
 
 exports.aiImageSearch = onRequest(
   { maxInstances: 10, secrets: ["GROQ_API_KEY"] },
@@ -194,14 +199,20 @@ exports.aiImageSearch = onRequest(
         if (!enforcePost(req, res)) return;
 
         if (!GROQ_API_KEY)
-          return res.status(500).json({ ok: false, message: "Missing GROQ_API_KEY" });
+          return res
+            .status(500)
+            .json({ ok: false, message: "Missing GROQ_API_KEY" });
 
         const { imageDataUrl, query = "" } = req.body || {};
         if (!imageDataUrl)
-          return res.status(400).json({ ok: false, message: "Missing imageDataUrl" });
+          return res
+            .status(400)
+            .json({ ok: false, message: "Missing imageDataUrl" });
 
         if (!enforceImageSize(imageDataUrl))
-          return res.status(400).json({ ok: false, message: "Image too large" });
+          return res
+            .status(400)
+            .json({ ok: false, message: "Image too large" });
 
         const products = await loadProductsFromFirestore();
         const catalog = compactCatalog(products);
@@ -244,11 +255,10 @@ exports.aiImageSearch = onRequest(
         return res.status(500).json({ ok: false, message: e.message });
       }
     });
-  }
+  },
 );
 
-// -------- AI PRODUCT GENERATOR --------
-
+// AI Product Generator
 
 exports.generateProduct = onRequest(
   { secrets: ["GROQ_API_KEY"] },
@@ -258,49 +268,56 @@ exports.generateProduct = onRequest(
         if (!enforcePost(req, res)) return;
 
         if (!GROQ_API_KEY)
-          return res.status(500).json({ ok: false, message: "Missing GROQ_API_KEY" });
+          return res
+            .status(500)
+            .json({ ok: false, message: "Missing GROQ_API_KEY" });
 
         const { prompt } = req.body || {};
         if (!prompt || !String(prompt).trim())
           return res.status(400).json({ ok: false, message: "Missing prompt" });
 
-        // Load categories so the AI can pick a real one
+        // Load categories so the AI can pick a real one and we can return the name along with the ID.
+        // This also helps ensure the AI doesn't hallucinate a new category that doesn't exist in our store.
+
         const catSnap = await db.collection("categories").get();
-        const categories = catSnap.docs.map((d) => ({ id: d.id, name: d.data().name || "" }));
+        const categories = catSnap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name || "",
+        }));
 
         const system = `
-You are a product data generator for a premium South African lamp store called "Actually Good Lamps".
+          You are a product data generator for a premium South African lamp store called "Actually Good Lamps".
 
-Given a short prompt, generate a complete, realistic lamp product listing.
+          Given a short prompt, generate a complete, realistic lamp product listing.
 
-You MUST return ONLY valid JSON — no markdown, no explanation, no backticks.
+          You MUST return ONLY valid JSON — no markdown, no explanation, no backticks.
 
-The JSON must have exactly these fields:
-{
-  "name": "string — creative, premium product name",
-  "description": "string — 2-3 sentences, evocative and luxurious, describing the lamp",
-  "price": number — realistic ZAR retail price (between 500 and 8000),
-  "costPrice": number — realistic ZAR cost price (roughly 40-60% of price),
-  "stock": number — between 3 and 20,
-  "material": "one of: Wood, Brass, Ceramic, Glass, Metal, Rattan, Marble",
-  "lightQuality": "one of: Warm, Neutral, Cool",
-  "features": ["array", "of", "strings", "from: LED, Smart, Dimmable, Halogen, Touch"],
-  "tags": ["array", "of", "2-5", "lowercase", "descriptive", "tags"],
-  "categoryId": "string — pick the most relevant id from the categories list",
-  "categoryName": "string — the matching category name"
-}
+          The JSON must have exactly these fields:
+          {
+            "name": "string — creative, premium product name",
+            "description": "string — 2-3 sentences, evocative and luxurious, describing the lamp",
+            "price": number — realistic ZAR retail price (between 500 and 8000),
+            "costPrice": number — realistic ZAR cost price (roughly 40-60% of price),
+            "stock": number — between 3 and 20,
+            "material": "one of: Wood, Brass, Ceramic, Glass, Metal, Rattan, Marble",
+            "lightQuality": "one of: Warm, Neutral, Cool",
+            "features": ["array", "of", "strings", "from: LED, Smart, Dimmable, Halogen, Touch"],
+            "tags": ["array", "of", "2-5", "lowercase", "descriptive", "tags"],
+            "categoryId": "string — pick the most relevant id from the categories list",
+            "categoryName": "string — the matching category name"
+          }
 
-Available categories:
-${JSON.stringify(categories)}
+          Available categories:
+          ${JSON.stringify(categories)}
 
-Rules:
-- Always pick a real categoryId from the list above
-- Price must be a number, not a string
-- features must be an array (can be empty)
-- tags must be an array of lowercase strings
-- Write the description in a warm, editorial tone — like a luxury interior design magazine
-- Do NOT include imageUrl
-`.trim();
+          Rules:
+          - Always pick a real categoryId from the list above
+          - Price must be a number, not a string
+          - features must be an array (can be empty)
+          - tags must be an array of lowercase strings
+          - Write the description in a warm, editorial tone — like a luxury interior design magazine
+          - Do NOT include imageUrl
+          `.trim();
 
         const data = await groqChat({
           model: "llama-3.1-8b-instant",
@@ -324,28 +341,34 @@ Rules:
           });
         }
 
-        // Validate and sanitise
+        // this Validates and cleans the parsed data to ensure it matches our expected types and formats,
+        // and applies defaults where necessary
+
         const product = {
-          name:         String(parsed.name         || "").trim(),
-          description:  String(parsed.description  || "").trim(),
-          price:        Number(parsed.price)        || 0,
-          costPrice:    Number(parsed.costPrice)    || 0,
-          stock:        Number(parsed.stock)        || 5,
-          material:     String(parsed.material      || "Metal"),
-          lightQuality: String(parsed.lightQuality  || "Warm"),
-          features:     Array.isArray(parsed.features) ? parsed.features.map(String) : [],
-          tags:         Array.isArray(parsed.tags)     ? parsed.tags.map(String)     : [],
-          categoryId:   String(parsed.categoryId   || ""),
+          name: String(parsed.name || "").trim(),
+          description: String(parsed.description || "").trim(),
+          price: Number(parsed.price) || 0,
+          costPrice: Number(parsed.costPrice) || 0,
+          stock: Number(parsed.stock) || 5,
+          material: String(parsed.material || "Metal"),
+          lightQuality: String(parsed.lightQuality || "Warm"),
+          features: Array.isArray(parsed.features)
+            ? parsed.features.map(String)
+            : [],
+          tags: Array.isArray(parsed.tags) ? parsed.tags.map(String) : [],
+          categoryId: String(parsed.categoryId || ""),
           categoryName: String(parsed.categoryName || ""),
         };
 
         if (!product.name)
-          return res.status(500).json({ ok: false, message: "AI did not return a product name." });
+          return res
+            .status(500)
+            .json({ ok: false, message: "AI did not return a product name." });
 
         return res.json({ ok: true, product });
       } catch (e) {
         return res.status(500).json({ ok: false, message: e.message });
       }
     });
-  }
+  },
 );

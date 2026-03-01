@@ -4,7 +4,7 @@ import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/
 import { db } from "../../../firebase/firebase";
 import { collection, updateDoc, doc, onSnapshot } from "firebase/firestore";
 
-/* ── Styles ── */
+/* Styles */
 if (!document.getElementById("agl-dash-style")) {
   const style = document.createElement("style");
   style.id = "agl-dash-style";
@@ -78,7 +78,7 @@ if (!document.getElementById("agl-dash-style")) {
 
     .dash-search-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
 
-    /* ── AI Generator ── */
+    /*  AI Generator  */
     .dash-ai-box { background: rgba(21,12,12,0.5); border: 1px solid rgba(211,152,88,0.2); border-radius: 2px; padding: 20px; margin-bottom: 20px; }
     .dash-ai-label { font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--whiskey); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
     .dash-ai-label::before { content: '✦'; font-size: 11px; }
@@ -146,6 +146,7 @@ export default function Dashboard() {
   } = useContext(MyContext);
 
   // AI generator state
+
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiGenMsg, setAiGenMsg] = useState({ type: "", text: "" });
@@ -153,6 +154,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState("overview");
 
   // customers
+
   const [customers, setCustomers] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [expandedCustomer, setExpandedCustomer] = useState(null);
@@ -168,11 +170,13 @@ export default function Dashboard() {
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
   // category state
+
   const [newCat, setNewCat] = useState("");
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingCatName, setEditingCatName] = useState("");
 
   // product state
+
   const emptyForm = { name:"", price:"", costPrice:"", stock:"", categoryId:"", categoryName:"", tagsText:"", imageUrl:"", description:"", material:"Metal", lightQuality:"Warm", featuresText:"", isActive:true };
   const [productForm, setProductForm] = useState(emptyForm);
   const [editingProductId, setEditingProductId] = useState(null);
@@ -180,6 +184,7 @@ export default function Dashboard() {
   const [productMsg, setProductMsg] = useState({ type:"", text:"" });
 
   // image upload
+
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -187,17 +192,20 @@ export default function Dashboard() {
   const fileInputRef = useRef(null);
 
   // order state
+
   const [orderStatus, setOrderStatus] = useState("All");
   const [paymentFilter, setPaymentFilter] = useState("All");
   const [orderSearch, setOrderSearch] = useState("");
   const [expandedOrder, setExpandedOrder] = useState(null);
 
   // customer search
+
   const [customerSearch, setCustomerSearch] = useState("");
 
   const parseComma = (t) => t.split(",").map((s) => s.trim()).filter(Boolean);
 
   // AI generate handler
+
   const handleGenerate = async () => {
     if (!aiPrompt.trim()) return;
     setAiGenerating(true);
@@ -231,6 +239,7 @@ export default function Dashboard() {
   };
 
   // image helpers
+
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
@@ -251,9 +260,11 @@ export default function Dashboard() {
   });
 
   // category helpers
+
   const handleAddCategory = async () => { if (!newCat.trim()) return; await addCategory(newCat); setNewCat(""); };
 
   // product helpers
+
   const onPickCategory = (catId) => {
     const cat = categories.find((c) => c.id === catId);
     setProductForm((p) => ({ ...p, categoryId: catId, categoryName: cat?.name || "" }));
@@ -302,7 +313,8 @@ export default function Dashboard() {
 
   const updateOrderStatus = async (orderId, status) => await updateDoc(doc(db, "orders", orderId), { status });
 
-  // computed
+  // computed so we can easily apply filters and search without hitting the database repeatedly
+
   const filteredOrders = useMemo(() => {
     const q = orderSearch.trim().toLowerCase();
     return orders
@@ -360,7 +372,7 @@ export default function Dashboard() {
 
   return (
     <div className="dash-shell">
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside className="dash-sidebar">
         <div className="dash-logo" style={{ cursor: "pointer" }} onClick={() => setTab("overview")}>
           <div className="dash-logo-main">AGL</div>
@@ -376,12 +388,14 @@ export default function Dashboard() {
         <div className="dash-sidebar-footer">Actually Good Lamps · Admin</div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* Main */}
+
       <main className="dash-main">
         {adminError && <div className="dash-alert">{adminError}</div>}
         {adminLoading && <div style={{ fontSize: 11, color: "var(--whiskey)", opacity: 0.6, marginBottom: 12, letterSpacing: "0.1em" }}>Working…</div>}
 
-        {/* ══ OVERVIEW ══ */}
+        {/* Overview */}
+
         {tab === "overview" && <>
           <div className="dash-page-header">
             <h1 className="dash-page-title">Overview</h1>
@@ -457,7 +471,8 @@ export default function Dashboard() {
           </div>
         </>}
 
-        {/* ══ PRODUCTS ══ */}
+        {/* Products */}
+
         {tab === "products" && <>
           <div className="dash-page-header">
             <h1 className="dash-page-title">Products</h1>
@@ -465,7 +480,7 @@ export default function Dashboard() {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"380px 1fr", gap:24, alignItems:"start" }}>
             <div className="dash-panel">
-              {/* ── AI Generator ── */}
+              {/* AI Generator */}
               <div className="dash-ai-box">
                 <div className="dash-ai-label">Generate with AI</div>
                 <div className="dash-ai-row">
@@ -581,7 +596,8 @@ export default function Dashboard() {
           </div>
         </>}
 
-        {/* ══ CATEGORIES ══ */}
+        {/* Categories */}
+
         {tab === "categories" && <>
           <div className="dash-page-header">
             <h1 className="dash-page-title">Categories</h1>
@@ -623,7 +639,8 @@ export default function Dashboard() {
           </div>
         </>}
 
-        {/* ══ ORDERS ══ */}
+        {/* Orders */}
+
         {tab === "orders" && <>
           <div className="dash-page-header">
             <h1 className="dash-page-title">Orders</h1>
@@ -705,7 +722,8 @@ export default function Dashboard() {
           )}
         </>}
 
-        {/* ══ CUSTOMERS ══ */}
+        {/* Customers */}
+
         {tab === "customers" && <>
           <div className="dash-page-header">
             <h1 className="dash-page-title">Customers</h1>
@@ -761,7 +779,8 @@ export default function Dashboard() {
           )}
         </>}
 
-        {/* ══ REPORTS ══ */}
+        {/* Reports */}
+
         {tab === "reports" && <>
           <div className="dash-page-header">
             <h1 className="dash-page-title">Reports</h1>

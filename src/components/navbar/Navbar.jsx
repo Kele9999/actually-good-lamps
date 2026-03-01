@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 import { FiShoppingCart, FiHeart } from "react-icons/fi";
 
-/* ── Styles ── */
+/* Styles */
 if (!document.getElementById("agl-navbar-style")) {
   const style = document.createElement("style");
   style.id = "agl-navbar-style";
@@ -39,7 +39,7 @@ if (!document.getElementById("agl-navbar-style")) {
       margin: 0 auto;
     }
 
-    /* Logo — left */
+    /* Logo (left) */
     .agl-nav-logo {
       text-decoration: none;
       display: flex;
@@ -62,7 +62,7 @@ if (!document.getElementById("agl-navbar-style")) {
       opacity: 0.55;
     }
 
-    /* Center nav links */
+    /* Center navbar links */
     .agl-nav-center {
       display: flex;
       align-items: center;
@@ -95,7 +95,7 @@ if (!document.getElementById("agl-navbar-style")) {
     .agl-nav-link.active { opacity: 1; color: var(--whiskey); }
     .agl-nav-link.active::after { transform: scaleX(1); background: var(--whiskey); }
 
-    /* Right side */
+    /* Right side of navbar */
     .agl-nav-right {
       display: flex;
       align-items: center;
@@ -210,13 +210,15 @@ function Navbar() {
       <header className="agl-nav">
         <div className="agl-nav-inner">
 
-          {/* ── Logo ── */}
+          {/*  Logo  */}
+
           <Link to={isAdmin ? "/dashboard" : "/"} className="agl-nav-logo">
             <span className="agl-nav-logo-main">AGL</span>
             <span className="agl-nav-logo-sub">Actually Good Lamps</span>
           </Link>
 
-          {/* ── Center links ── */}
+          {/* Center links */}
+
           <nav className="agl-nav-center">
             {!isAdmin && (
               <>
@@ -236,7 +238,8 @@ function Navbar() {
             )}
           </nav>
 
-          {/* ── Right side ── */}
+          {/* Right side of navbar */}
+
           <div className="agl-nav-right">
             {!isAdmin && (
               <>
@@ -277,6 +280,7 @@ function Navbar() {
       </header>
 
       {/* Pushes page content below the fixed nav */}
+
       <div className="agl-nav-spacer" />
     </>
   );
