@@ -1,32 +1,10 @@
 import { useContext, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 
-const norm = (v) => String(v || "").toLowerCase();
-
-const scoreProduct = (p, terms) => {
-  const hay = [
-    p.name,
-    p.description,
-    p.categoryName,
-    p.material,
-    ...(Array.isArray(p.tags) ? p.tags : []),
-    ...(Array.isArray(p.features) ? p.features : []),
-  ]
-    .map(norm)
-    .join(" ");
-
-  let score = 0;
-  for (const t of terms) {
-    if (!t) continue;
-    if (hay.includes(t)) score += 1;
-  }
-  return score;
-};
-
-function AllProducts() {
+export default function AllProducts() {
   const {
     products,
+    categories,
     filteredProducts,
     filters,
     setFilters,
@@ -35,46 +13,37 @@ function AllProducts() {
     productsLoading,
     productsError,
     toggleWishlist,
-    wishlistIds, // Set
+    wishlistIds,
+    // AI search from context
+    aiResultsProducts,
+    aiResultIds,
+    aiQuery,
+    clearAiResults,
   } = useContext(MyContext);
 
-  const location = useLocation();
-  const navigate = useNavigate();
+  const aiActive = aiResultIds.length > 0;
 
-  const aiQuery = location.state?.aiQuery || "";
+  // Use AI results if active, otherwise use normal filtered products
+  const listToShow = aiActive ? aiResultsProducts : filteredProducts;
 
-  const aiResults = useMemo(() => {
-    if (!aiQuery || !products.length) return null;
-
-    const terms = aiQuery
-      .toLowerCase()
-      .split(/\s+/)
-      .map((x) => x.trim())
-      .filter(Boolean);
-
-    const ranked = [...products]
-      .map((p) => ({ p, s: scoreProduct(p, terms) }))
-      .filter((x) => x.s > 0)
-      .sort((a, b) => b.s - a.s)
-      .map((x) => x.p);
-
-    return ranked;
-  }, [aiQuery, products]);
-
-  // ✅ AI overrides filters (only if aiQuery exists)
-  const listToShow = aiResults ?? filteredProducts;
-
-  // For dropdown options, prefer categoryName (since you’re using categoryId/categoryName)
   const categoryOptions = useMemo(() => {
-    const names = products
-      .map((p) => p.categoryName || p.category) // fallback if old docs still exist
-      .filter(Boolean);
-    return [...new Set(names)];
-  }, [products]);
+    const cats = Array.isArray(categories) ? categories : [];
+    return cats.map((c) => ({ id: c.id, name: c.name || "Unnamed" }));
+  }, [categories]);
 
-  const clearAiSearch = () => {
-    // Clear route state (aiQuery) without changing page
-    navigate("/products", { replace: true, state: {} });
+  const resetFilters = () => {
+    clearAiResults();
+    setFilters({
+      search: "",
+      minPrice: "",
+      maxPrice: "",
+      category: "All",
+      lightQuality: "All",
+      material: "All",
+      features: [],
+      inStockOnly: false,
+      sort: "featured",
+    });
   };
 
   return (
@@ -85,43 +54,31 @@ function AllProducts() {
         Items in cart: {cartCount} • Showing {listToShow.length} of {products.length}
       </p>
 
-      {/* ✅ AI banner */}
-      {aiQuery ? (
+      {aiActive && (
         <div
           style={{
             border: "1px solid #ddd",
             borderRadius: 10,
             padding: 10,
             marginBottom: 12,
-            background: "#fafafa",
+            background: "white",
             display: "flex",
             justifyContent: "space-between",
-            gap: 12,
+            gap: 10,
             alignItems: "center",
           }}
         >
-          <div style={{ fontSize: 14 }}>
-            <strong>AI search:</strong> {aiQuery}
-            <div style={{ fontSize: 12, opacity: 0.8 }}>
-              Showing best matches (filters are ignored until you clear AI search)
+          <div style={{ fontSize: 13 }}>
+            <strong>AI search:</strong> {aiQuery || "(no query text)"}
+            <div style={{ fontSize: 12, opacity: 0.75 }}>
+              Showing AI matches only. Clear to go back to normal filtering.
             </div>
           </div>
-
-          <button
-            onClick={clearAiSearch}
-            style={{
-              border: "1px solid #ddd",
-              padding: "8px 10px",
-              borderRadius: 8,
-              background: "white",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
+          <button onClick={clearAiResults} style={{ padding: "8px 10px", cursor: "pointer" }}>
             Clear AI search
           </button>
         </div>
-      ) : null}
+      )}
 
       {productsLoading && <p>Loading products...</p>}
       {productsError && <p style={{ color: "red" }}>{productsError}</p>}
@@ -135,7 +92,7 @@ function AllProducts() {
             alignItems: "start",
           }}
         >
-          {/* Left sidebar */}
+          {/* LEFT SIDEBAR */}
           <aside
             style={{
               border: "1px solid #ddd",
@@ -151,9 +108,7 @@ function AllProducts() {
             <input
               placeholder="Search..."
               value={filters.search}
-              onChange={(e) =>
-                setFilters((p) => ({ ...p, search: e.target.value }))
-              }
+              onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
               style={{ width: "100%", padding: 8, marginBottom: 10 }}
             />
 
@@ -163,9 +118,7 @@ function AllProducts() {
                 <input
                   type="number"
                   value={filters.minPrice}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, minPrice: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, minPrice: e.target.value }))}
                   style={{ width: "100%", padding: 8 }}
                 />
               </div>
@@ -175,26 +128,22 @@ function AllProducts() {
                 <input
                   type="number"
                   value={filters.maxPrice}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, maxPrice: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, maxPrice: e.target.value }))}
                   style={{ width: "100%", padding: 8 }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: 12 }}>Type</label>
+                <label style={{ fontSize: 12 }}>Category</label>
                 <select
                   value={filters.category}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, category: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, category: e.target.value }))}
                   style={{ width: "100%", padding: 8 }}
                 >
                   <option value="All">All</option>
                   {categoryOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -204,9 +153,7 @@ function AllProducts() {
                 <label style={{ fontSize: 12 }}>Light quality</label>
                 <select
                   value={filters.lightQuality}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, lightQuality: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, lightQuality: e.target.value }))}
                   style={{ width: "100%", padding: 8 }}
                 >
                   <option value="All">All</option>
@@ -220,9 +167,7 @@ function AllProducts() {
                 <label style={{ fontSize: 12 }}>Material</label>
                 <select
                   value={filters.material}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, material: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, material: e.target.value }))}
                   style={{ width: "100%", padding: 8 }}
                 >
                   <option value="All">All</option>
@@ -266,29 +211,12 @@ function AllProducts() {
                 <input
                   type="checkbox"
                   checked={filters.inStockOnly}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, inStockOnly: e.target.checked }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, inStockOnly: e.target.checked }))}
                 />
                 In stock only
               </label>
 
-              <button
-                onClick={() =>
-                  setFilters({
-                    search: "",
-                    minPrice: "",
-                    maxPrice: "",
-                    category: "All",
-                    lightQuality: "All",
-                    material: "All",
-                    features: [],
-                    inStockOnly: false,
-                    sort: "featured",
-                  })
-                }
-                style={{ padding: 10, cursor: "pointer" }}
-              >
+              <button onClick={resetFilters} style={{ padding: 10, cursor: "pointer" }}>
                 Reset
               </button>
 
@@ -296,9 +224,7 @@ function AllProducts() {
                 <label style={{ fontSize: 12 }}>Sort</label>
                 <select
                   value={filters.sort}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, sort: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((p) => ({ ...p, sort: e.target.value }))}
                   style={{ width: "100%", padding: 8 }}
                 >
                   <option value="featured">Featured</option>
@@ -310,64 +236,36 @@ function AllProducts() {
             </div>
           </aside>
 
-          {/* right grid */}
+          {/* RIGHT GRID */}
           <section>
             {listToShow.length === 0 ? (
-              <p>{aiQuery ? "No AI matches found." : "No products match your filters."}</p>
+              <p>No products match your filters.</p>
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 16,
-                }}
-              >
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
                 {listToShow.map((p) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      border: "1px solid #ddd",
-                      padding: 12,
-                      borderRadius: 8,
-                    }}
-                  >
+                  <div key={p.id} style={{ border: "1px solid #ddd", padding: 12, borderRadius: 8 }}>
                     <img
-                      src={p.imageUrl || ""}
+                      src={p.imageUrl || undefined}
                       alt={p.name}
-                      style={{
-                        width: "100%",
-                        height: 180,
-                        objectFit: "cover",
-                        borderRadius: 6,
-                      }}
+                      style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 6 }}
                     />
                     <h3>{p.name}</h3>
                     <p>R {p.price}</p>
-                    <p style={{ fontSize: 12 }}>{p.categoryName || p.category}</p>
-                    <p style={{ fontSize: 12 }}>
-                      {p.material} • {p.lightQuality}
-                    </p>
+                    <p style={{ fontSize: 12 }}>{p.categoryName || ""}</p>
+                    <p style={{ fontSize: 12 }}>{p.material} • {p.lightQuality}</p>
                     <p style={{ fontSize: 12 }}>
                       {Array.isArray(p.features) ? p.features.join(", ") : ""}
                     </p>
-                    <p style={{ fontSize: 12 }}>Stock: {p.stock}</p>
 
-                    <button
-                      onClick={() => addToCart(p, 1)}
-                      disabled={(Number(p.stock) || 0) <= 0}
-                      style={{
-                        cursor:
-                          (Number(p.stock) || 0) <= 0 ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {(Number(p.stock) || 0) <= 0 ? "Out of stock" : "Add to cart"}
+                    <button onClick={() => addToCart(p, 1)} style={{ cursor: "pointer" }}>
+                      Add to cart
                     </button>
 
                     <button
                       onClick={() => toggleWishlist(p)}
                       style={{ cursor: "pointer", marginLeft: 8 }}
                     >
-                      {wishlistIds?.has?.(p.id) ? "♥ Saved" : "♡ Save"}
+                      {wishlistIds.has(p.id) ? "♥️ Saved" : "♡ Save"}
                     </button>
                   </div>
                 ))}
@@ -379,5 +277,3 @@ function AllProducts() {
     </div>
   );
 }
-
-export default AllProducts;

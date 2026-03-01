@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import MyContext from "./myContext";
 
 import { fetchProducts } from "../../firebase/products";
 import { auth, db } from "../../firebase/firebase";
-
 
 import {
   onAuthStateChanged,
@@ -13,42 +12,58 @@ import {
 } from "firebase/auth";
 
 import {
+  addDoc,
+  collection,
+  deleteDoc,
   doc,
   getDoc,
-  setDoc,
-  serverTimestamp,
-  collection,
-  addDoc,
-  deleteDoc,
   getDocs,
-  query,
-  where,
-  updateDoc,
   onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
 } from "firebase/firestore";
 
-import { addWishlistItem, removeWishlistItem } from "../../firebase/wishlist";
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-const GUEST_WISHLIST_KEY = "guest_wishlist";
+function getFunctionsBaseUrl() {
+  const customBase = String(import.meta.env.VITE_FUNCTIONS_BASE_URL || "").trim();
+  if (customBase) return customBase.replace(/\/+$/, "");
+
+  const useEmu =
+    String(import.meta.env.VITE_USE_EMULATORS || "").toLowerCase() === "true";
+
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  if (!projectId) throw new Error("Missing VITE_FIREBASE_PROJECT_ID");
+
+  if (useEmu) return `http://127.0.0.1:5001/${projectId}/us-central1`;
+  return `https://us-central1-${projectId}.cloudfunctions.net`;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ─── MyState ────────────────────────────────────────────────────────────────
 
 export default function MyState({ children }) {
 
-  // Authentication state: user object, role (guest, customer, admin), loading state for authentication check
-
+  // ── Auth ──
   const [user, setUser] = useState(null);
   const [role, setRole] = useState("guest");
   const [authLoading, setAuthLoading] = useState(true);
 
-
-  // Products state
- 
+  // ── Products ──
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState(null);
 
- 
-  // Filters for products page (not admin filters)
- 
+  // ── Filters ──
   const [filters, setFilters] = useState({
     search: "",
     minPrice: "",
@@ -61,78 +76,71 @@ export default function MyState({ children }) {
     sort: "featured",
   });
 
+  // ── AI Search ──
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResultIds, setAiResultIds] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
-  // Cart state for logged in users (localStorage) and guests (sessionStorage)
- 
-const CART_KEY_GUEST = "cart_guest";
-const CART_KEY_USER = (uid) => `agl_cart_user_${uid}`;
+  const clearAiResults = useCallback(() => {
+    setAiQuery("");
+    setAiResultIds([]);
+    setAiError("");
+    setAiLoading(false);
+  }, []);
 
-const [cartItems, setCartItems] = useState(() => {
-  try {
-    // if logged in, load their cart key; else load guest key
-    const key = user ? CART_KEY_USER(user.uid) : CART_KEY_GUEST;
-    return JSON.parse((user ? localStorage : sessionStorage).getItem(key) || "[]");
-  } catch {
-    return [];
-  }
-});
+  // ── Cart ──
+  const [cartItems, setCartItems] = useState([]);
 
-const mergeCarts = (guest, userCart) => {
-  const map = new Map();
+  const cartStorageKey = useMemo(() => {
+    return `agl_cart_v1:${user?.uid || "guest"}`;
+  }, [user]);
 
-  // start with user cart
-  for (const item of userCart) {
-    map.set(item.id, { ...item, quantity: Number(item.quantity) || 1 });
-  }
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(cartStorageKey);
+      setCartItems(raw ? JSON.parse(raw) : []);
+    } catch {
+      setCartItems([]);
+    }
+  }, [cartStorageKey]);
 
-  // merge guest cart
-  for (const item of guest) {
-    const qty = Number(item.quantity) || 1;
-  if (map.has(item.id)) {
-    map.set(item.id, { ...map.get(item.id), quantity: map.get(item.id).quantity + qty });
-  } else {
-    map.set(item.id, { ...item, quantity: qty });
-  }
-}
+  useEffect(() => {
+    try {
+      localStorage.setItem(cartStorageKey, JSON.stringify(cartItems));
+    } catch {
+      // ignore
+    }
+  }, [cartItems, cartStorageKey]);
 
-return Array.from(map.values());
-};
-
-
-  // Admin
-
+  // ── Admin ──
   const [categories, setCategories] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
-
-
-  // orders for admin dashboard
- 
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
-
-  // Wishlist statwe for logged in users (from Firestore) and guests (from sessionStorage)
- 
-  const [wishlist, setWishlist] = useState([]); // firestore wishlist docs
+  // ── Wishlist ──
+  const GUEST_WISHLIST_KEY = "agl_guest_wishlist_v1";
   const [guestWishlist, setGuestWishlist] = useState(() => {
     try {
-      return JSON.parse(sessionStorage.getItem(GUEST_WISHLIST_KEY) || "[]");
+      return JSON.parse(sessionStorage.getItem(GUEST_WISHLIST_KEY)) || [];
     } catch {
       return [];
     }
   });
 
-  // keep guest wishlist in session storage
   useEffect(() => {
-    sessionStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(guestWishlist));
+    try {
+      sessionStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(guestWishlist));
+    } catch {
+      // ignore
+    }
   }, [guestWishlist]);
 
- 
-  // Authentication state listener and role loading on mount. We set role to "guest" by default
-  // and only update it if we find a logged in user with a role in Firestore. 
-  // This way we avoid a flash of "customer" role for guests while we check auth state.
- 
+  const [wishlist, setWishlist] = useState([]);
+
+  // ── Auth listener ──
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -168,30 +176,7 @@ return Array.from(map.values());
     return () => unsub();
   }, []);
 
-
-  // Load products on mount (no real-time listener here since we don't expect products to change often;
-  // admin dashboard handles real-time updates for product management)
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setProductsLoading(true);
-        const data = await fetchProducts();
-        setProducts(data);
-        setProductsError(null);
-      } catch (err) {
-        setProductsError(err?.message || "Failed to load products");
-      } finally {
-        setProductsLoading(false);
-      }
-    };
-
-    loadProducts();
-  }, []);
-
-
-  // Firestore listener for wishlist changes for logged in user (real-time sync)
- 
+  // ── Wishlist listener ──
   useEffect(() => {
     if (!user) {
       setWishlist([]);
@@ -200,147 +185,269 @@ return Array.from(map.values());
 
     const ref = collection(db, "users", user.uid, "wishlist");
     const unsub = onSnapshot(ref, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setWishlist(list);
+      setWishlist(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
     return () => unsub();
   }, [user]);
 
+  const wishlistItems = useMemo(() => {
+    return user ? wishlist : guestWishlist;
+  }, [user, wishlist, guestWishlist]);
 
-  // Admin orders listener - only load if admin (no need to load orders for customers in this simple app)
-  
+  const wishlistIds = useMemo(() => {
+    return new Set(wishlistItems.map((w) => w.productId || w.id));
+  }, [wishlistItems]);
+
+  const toggleWishlist = useCallback(
+    async (product) => {
+      const id = product?.id;
+      if (!id) return;
+
+      if (!user) {
+        setGuestWishlist((prev) => {
+          const exists = prev.find((p) => p.id === id);
+          return exists ? prev.filter((p) => p.id !== id) : [...prev, product];
+        });
+        return;
+      }
+
+      const saved = wishlistIds.has(id);
+      const ref = doc(db, "users", user.uid, "wishlist", id);
+
+      if (saved) {
+        await deleteDoc(ref);
+      } else {
+        await setDoc(ref, {
+          productId: id,
+          name: product.name || "",
+          price: Number(product.price) || 0,
+          imageUrl: product.imageUrl || "",
+          categoryId: product.categoryId || "",
+          categoryName: product.categoryName || "",
+          createdAt: serverTimestamp(),
+        });
+      }
+    },
+    [user, wishlistIds],
+  );
+
+  // ── Products load ──
   useEffect(() => {
-    if (role !== "admin") {
-      setOrders([]); 
-      setOrdersLoading(false);
-      return;
+    const load = async () => {
+      try {
+        setProductsLoading(true);
+        const data = await fetchProducts();
+        setProducts(data || []);
+        setProductsError(null);
+      } catch (err) {
+        setProductsError(err?.message || "Failed to load products");
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  // ── Filtered products ──
+  const filteredProducts = useMemo(() => {
+    const q = filters.search.trim().toLowerCase();
+    const min = filters.minPrice === "" ? null : Number(filters.minPrice);
+    const max = filters.maxPrice === "" ? null : Number(filters.maxPrice);
+
+    const filtered = products.filter((p) => {
+      if (q) {
+        const hay = `${p.name || ""} ${p.description || ""} ${p.categoryName || ""} ${p.material || ""} ${
+          Array.isArray(p.tags) ? p.tags.join(" ") : ""
+        } ${Array.isArray(p.features) ? p.features.join(" ") : ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+
+      const price = Number(p.price) || 0;
+      if (min !== null && price < min) return false;
+      if (max !== null && price > max) return false;
+
+      if (filters.category !== "All") {
+        const productCategoryId = p.categoryId || "";
+        const productCategoryName = p.categoryName || p.category || "";
+        if (
+          filters.category !== productCategoryId &&
+          filters.category !== productCategoryName
+        ) {
+          return false;
+        }
+      }
+
+      if (filters.lightQuality !== "All" && p.lightQuality !== filters.lightQuality)
+        return false;
+      if (filters.material !== "All" && p.material !== filters.material)
+        return false;
+
+      if (filters.features.length > 0) {
+        const feats = Array.isArray(p.features) ? p.features : [];
+        if (!filters.features.every((f) => feats.includes(f))) return false;
+      }
+
+      if (filters.inStockOnly && (Number(p.stock) || 0) <= 0) return false;
+
+      return true;
+    });
+
+    const sorted = [...filtered];
+    switch (filters.sort) {
+      case "price-asc":
+        sorted.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+        break;
+      case "price-desc":
+        sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+        break;
+      case "name-asc":
+        sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        break;
+      default:
+        break;
     }
 
-    setOrdersLoading(true);
+    return sorted;
+  }, [products, filters]);
+
+  // ── AI results → real products ──
+  const aiResultsProducts = useMemo(() => {
+    if (!aiResultIds.length) return [];
+    const map = new Map(products.map((p) => [p.id, p]));
+    return aiResultIds.map((id) => map.get(id)).filter(Boolean);
+  }, [aiResultIds, products]);
+
+  // ── AI text search ──
+  const aiSearch = useCallback(async (query) => {
+    const q = String(query || "").trim();
+    if (!q) return { ok: false, message: "Missing query" };
+
+    setAiLoading(true);
+    setAiError("");
+    setAiQuery(q);
+
+    try {
+      const base = getFunctionsBaseUrl();
+      const res = await fetch(`${base}/aiProductSearch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data?.ok === false) {
+        const msg = data?.message || `AI search failed (${res.status})`;
+        setAiError(msg);
+        setAiResultIds([]);
+        return { ok: false, message: msg };
+      }
+
+      const ids = Array.isArray(data?.ids) ? data.ids : [];
+      setAiResultIds(ids);
+      return { ok: true, ids };
+    } catch (e) {
+      const msg = e?.message || "AI search failed";
+      setAiError(msg);
+      setAiResultIds([]);
+      return { ok: false, message: msg };
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
+  // ── AI image search ──
+  const aiImageSearch = useCallback(async (file, query = "") => {
+    if (!file) return { ok: false, message: "Missing image file" };
+    if (!String(file.type || "").startsWith("image/"))
+      return { ok: false, message: "Please upload an image file" };
+
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      const base = getFunctionsBaseUrl();
+      const imageDataUrl = await fileToDataUrl(file);
+
+      const res = await fetch(`${base}/aiImageSearch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageDataUrl, query: String(query || "").trim() }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data?.ok === false) {
+        const msg = data?.message || `AI image search failed (${res.status})`;
+        setAiError(msg);
+        setAiResultIds([]);
+        return { ok: false, message: msg };
+      }
+
+      const ids = Array.isArray(data?.ids) ? data.ids : [];
+      setAiResultIds(ids);
+      return { ok: true, ids, extractedQuery: String(data?.extractedQuery || "") };
+    } catch (e) {
+      const msg = e?.message || "AI image search failed";
+      setAiError(msg);
+      setAiResultIds([]);
+      return { ok: false, message: msg };
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
+  // ── Cart actions ──
+  const addToCart = useCallback((product, qty = 1) => {
+    setCartItems((prev) => {
+      const exists = prev.find((item) => item.id === product.id);
+      if (exists) {
+        return prev.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + qty }
+            : item,
+        );
+      }
+      return [...prev, { ...product, quantity: qty }];
+    });
+  }, []);
+
+  const removeFromCart = useCallback((id) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const updateQty = useCallback((id, qty) => {
+    const safeQty = Math.max(1, Number(qty) || 1);
+    setCartItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, quantity: safeQty } : it)),
+    );
+  }, []);
+
+  const clearCart = useCallback(() => setCartItems([]), []);
+
+  const cartCount = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    [cartItems],
+  );
+
+  const cartTotal = useMemo(
+    () => cartItems.reduce((sum, item) => sum + (Number(item.price) || 0) * item.quantity, 0),
+    [cartItems],
+  );
+
+  // ── Orders ──
+  useEffect(() => {
+    if (role !== "admin") return;
+
     const unsub = onSnapshot(collection(db, "orders"), (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setOrders(list);
+      setOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setOrdersLoading(false);
     });
 
     return () => unsub();
   }, [role]);
 
-
-  // Authentication actions: signup, login, logout
-  
-  const signup = async (email, password) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-
-    await setDoc(doc(db, "users", cred.user.uid), {
-      email,
-      role: "customer",
-      createdAt: serverTimestamp(),
-    });
-
-    return cred.user;
-  };
-
-  const login = async (email, password) => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    return cred.user;
-  };
-
-  const logout = async () => {
-    await signOut(auth);
-  };
-
-
-  // Cart logic: we store cart in localStorage for logged in users and in sessionStorage for guests.
-  // On login, we merge guest cart into user cart and clear guest cart. On logout, 
-  // we keep user cart in localStorage and switch to guest cart in sessionStorage.
-  
-
-  useEffect(() => {
-    try {
-      const key = user ? CART_KEY_USER(user.uid) : CART_KEY_GUEST;
-      const storage = user ? localStorage : sessionStorage;
-      storage.setItem(key, JSON.stringify(cartItems));
-    } catch (e) {
-      console.error("Failed to save cart:", e); 
-    }
-  }, [cartItems, user]);
-
-  useEffect(() => {
-  try {
-    // 1) If user is logged out: load guest cart from sessionStorage
-    if (!user) {
-      const guestCart = JSON.parse(sessionStorage.getItem(CART_KEY_GUEST) || "[]");
-      setCartItems(guestCart);
-      return;
-    }
-
-    // 2) If user islogged in: merge guest cart -> user cart (localStorage)
-    const guestCart = JSON.parse(sessionStorage.getItem(CART_KEY_GUEST) || "[]");
-    const userKey = CART_KEY_USER(user.uid);
-    const userCart = JSON.parse(localStorage.getItem(userKey) || "[]");
-
-    const merged = mergeCarts(guestCart, userCart);
-
-    // save merged into user's localStorage cart
-    localStorage.setItem(userKey, JSON.stringify(merged));
-
-    // clear guest cart after merge
-    sessionStorage.removeItem(CART_KEY_GUEST);
-
-    // update state
-    setCartItems(merged);
-  } catch (e) {
-    console.error("Failed to load/merge cart:", e);
-    setCartItems([]); // if there is an error, we start with an empty cart to avoid blocking the user with a broken cart state
-  }
-}, [user]);
-
-  const addToCart = (product, qty = 1) => {
-    setCartItems((prev) => {
-      const exists = prev.find((item) => item.id === product.id);
-
-      if (exists) {
-        return prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + qty }
-            : item
-        );
-      }
-
-      return [...prev, { ...product, quantity: qty }];
-    });
-  };
-
-  const removeFromCart = (id) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const updateQty = (id, qty) => {
-    const safeQty = Math.max(1, Number(qty) || 1);
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: safeQty } : item
-      )
-    );
-  };
-
-  const clearCart = () => setCartItems([]);
-
-  const cartCount = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
-    [cartItems]
-  );
-
-  const cartTotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cartItems]
-  );
-
-
-  // Place order - firestore
- 
   const placeOrder = useCallback(
     async (customer) => {
       if (!user) return { ok: false, message: "Not logged in" };
@@ -353,23 +460,39 @@ return Array.from(map.values());
           items: cartItems,
           total: cartTotal,
           customer,
-          status: "pending",
+          status: "pending_payment",
           createdAt: serverTimestamp(),
         });
-
         setCartItems([]);
         return { ok: true, orderId: orderRef.id };
       } catch (err) {
-        console.error(err);
         return { ok: false, message: err?.message || "Order failed" };
       }
     },
-    [user, cartItems, cartTotal]
+    [user, cartItems, cartTotal],
   );
 
- 
-  // Admin categories crud
- 
+  // ── Auth actions ──
+  const signup = useCallback(async (email, password) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await setDoc(doc(db, "users", cred.user.uid), {
+      email,
+      role: "customer",
+      createdAt: serverTimestamp(),
+    });
+    return cred.user;
+  }, []);
+
+  const login = useCallback(async (email, password) => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    return cred.user;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut(auth);
+  }, []);
+
+  // ── Admin: Categories ──
   const fetchCategories = useCallback(async () => {
     setAdminError("");
     try {
@@ -378,52 +501,32 @@ return Array.from(map.values());
       list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
       setCategories(list);
     } catch (e) {
-      console.error(e);
       setAdminError(e?.message || "Failed to fetch categories");
     }
   }, []);
 
-const addCategory = useCallback(
-  async (name) => {
-    const clean = name.trim();
-    if (!clean) return;
-
-    const lower = clean.toLowerCase();
-
-    setAdminLoading(true);
-    setAdminError("");
-
-    try {
-      // check for duplicate category (case-insensitive) before adding
-      const q = query(collection(db, "categories"), where("nameLower", "==", lower));
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-        setAdminError("That category already exists.");
-        return;
+  const addCategory = useCallback(
+    async (name) => {
+      const clean = String(name || "").trim();
+      if (!clean) return;
+      setAdminLoading(true);
+      setAdminError("");
+      try {
+        await addDoc(collection(db, "categories"), { name: clean, createdAt: serverTimestamp() });
+        await fetchCategories();
+      } catch (e) {
+        setAdminError(e?.message || "Failed to add category");
+      } finally {
+        setAdminLoading(false);
       }
-
-      await addDoc(collection(db, "categories"), {
-        name: clean,
-        nameLower: lower,
-        createdAt: serverTimestamp(),
-      });
-
-      await fetchCategories();
-    } catch (e) {
-      setAdminError(e?.message || "Failed to add category");
-    } finally {
-      setAdminLoading(false);
-    }
-  },
-  [fetchCategories]
-);
+    },
+    [fetchCategories],
+  );
 
   const updateCategory = useCallback(
     async (id, name) => {
-      const clean = name.trim();
+      const clean = String(name || "").trim();
       if (!clean) return;
-
       setAdminLoading(true);
       setAdminError("");
       try {
@@ -435,7 +538,7 @@ const addCategory = useCallback(
         setAdminLoading(false);
       }
     },
-    [fetchCategories]
+    [fetchCategories],
   );
 
   const deleteCategory = useCallback(
@@ -451,19 +554,18 @@ const addCategory = useCallback(
         setAdminLoading(false);
       }
     },
-    [fetchCategories]
+    [fetchCategories],
   );
 
-
-  // Admin crud for products (add, update, delete). We don't refetch products after these actions; instead we rely on realtime updates from Firestore to keep the UI in sync. This is more efficient and provides instant feedback in the admin dashboard. However, it does mean that any Firestore errors won't be reflected in the UI immediately.
- 
-  const addProduct = async (product) => {
+  // ── Admin: Products ──
+  const addProduct = useCallback(async (product) => {
     setAdminLoading(true);
     setAdminError("");
     try {
       await addDoc(collection(db, "products"), {
         ...product,
-        tags: product.tags || [],
+        tags: Array.isArray(product.tags) ? product.tags : [],
+        features: Array.isArray(product.features) ? product.features : [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         isActive: true,
@@ -473,27 +575,26 @@ const addCategory = useCallback(
     } finally {
       setAdminLoading(false);
     }
-  };
+  }, []);
 
-  const updateProduct = async (id, updates) => {
-  setAdminLoading(true);
-  setAdminError("");
+  const updateProduct = useCallback(async (id, updates) => {
+    setAdminLoading(true);
+    setAdminError("");
+    try {
+      await updateDoc(doc(db, "products", id), {
+        ...updates,
+        tags: Array.isArray(updates.tags) ? updates.tags : [],
+        features: Array.isArray(updates.features) ? updates.features : [],
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      setAdminError(e?.message || "Failed to update product");
+    } finally {
+      setAdminLoading(false);
+    }
+  }, []);
 
-  try {
-    await updateDoc(doc(db, "products", id), {
-      ...updates,
-      // only include tags field if it's an array (to avoid overwriting with invalid data)
-      ...(Array.isArray(updates.tags) ? { tags: updates.tags } : {}),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (e) {
-    setAdminError(e?.message || "Failed to update product");
-  } finally {
-    setAdminLoading(false);
-  }
-};
-
-  const deleteProduct = async (id) => {
+  const deleteProduct = useCallback(async (id) => {
     setAdminLoading(true);
     setAdminError("");
     try {
@@ -503,164 +604,28 @@ const addCategory = useCallback(
     } finally {
       setAdminLoading(false);
     }
-  };
+  }, []);
 
-
-  // wishlist items for logged in user (from Firestore) or guest (from sessionStorage)
-
-  const wishlistItems = useMemo(() => {
-    return user ? wishlist : guestWishlist;
-  }, [user, wishlist, guestWishlist]);
-
-  const wishlistIds = useMemo(() => {
-    return new Set(wishlistItems.map((w) => w.productId || w.id));
-  }, [wishlistItems]);
-
-  const toggleWishlist = useCallback(
-    async (product) => {
-      const id = product.id;
-
-      // Guest user: session wishlist
-
-      if (!user) {
-        setGuestWishlist((prev) => {
-          const exists = prev.find((p) => p.id === id);
-          if (exists) return prev.filter((p) => p.id !== id);
-          return [...prev, product];
-        });
-        return { ok: true };
-      }
-
-      // Logged in user: Firestore wishlist
-
-      const saved = wishlistIds.has(id);
-      if (saved) {
-        await removeWishlistItem(user.uid, id);
-        return { ok: true, saved: false };
-      } else {
-        await addWishlistItem(user.uid, product);
-        return { ok: true, saved: true };
-      }
-    },
-    [user, wishlistIds]
-  );
-
-
-  // Filtered and sorted products based on filters
- 
-  const filteredProducts = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
-    const min = filters.minPrice === "" ? null : Number(filters.minPrice);
-    const max = filters.maxPrice === "" ? null : Number(filters.maxPrice);
-
-    const filtered = products.filter((p) => {
-      if (q) {
-        const hay = `${p.name || ""} ${p.description || ""} ${p.category || ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-
-      const price = Number(p.price) || 0;
-      if (min !== null && price < min) return false;
-      if (max !== null && price > max) return false;
-
-      const cat = p.categoryName || p.category || "";
-      if (filters.category !== "All" && cat !== filters.category) return false;
-      if (filters.lightQuality !== "All" && p.lightQuality !== filters.lightQuality) return false;
-      if (filters.material !== "All" && p.material !== filters.material) return false;
-
-      if (filters.features.length > 0) {
-        const feats = Array.isArray(p.features) ? p.features : [];
-        const ok = filters.features.every((f) => feats.includes(f));
-        if (!ok) return false;
-      }
-
-      if (filters.inStockOnly && (Number(p.stock) || 0) <= 0) return false;
-
-      return true;
-    });
-
-    const sorted = [...filtered];
-
-    switch (filters.sort) {
-      case "price-asc":
-        sorted.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-        break;
-      case "price-desc":
-        sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
-        break;
-      case "name-asc":
-        sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-        break;
-      case "featured":
-      default:
-        break;
-    }
-
-    return sorted;
-  }, [products, filters]);
-
-
-  const aiSearch = async (query) => {
-  const base = import.meta.env.DEV
-    ? "http://127.0.0.1:5001/actually-good-lamps/us-central1"
-    : "https://us-central1-actually-good-lamps.cloudfunctions.net";
-
-  const url = `${base}/aiTextSearch`;
-
-  console.log("AI SEARCH ->", { url, query });
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
-  });
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    const txt = await res.text();
-    console.log("AI SEARCH raw text:", txt);
-    throw new Error("Function did not return JSON");
-  }
-
-  console.log("AI SEARCH response:", { status: res.status, data });
-
-  if (!res.ok) {
-    throw new Error(data?.message || `Function error (${res.status})`);
-  }
-
-  const parsed = data?.result?.parsed || data?.parsed || data || {};
-
-  const next = {
-    search: parsed.search ?? query ?? "",
-    minPrice: parsed.minPrice ?? "",
-    maxPrice: parsed.maxPrice ?? "",
-    category: parsed.category ?? "All",
-    lightQuality: parsed.lightQuality ?? "All",
-    material: parsed.material ?? "All",
-    features: Array.isArray(parsed.features) ? parsed.features : [],
-    inStockOnly: Boolean(parsed.inStockOnly ?? false),
-    sort: "featured",
-  };
-
-  setFilters((p) => ({ ...p, ...next }));
-  return { ok: true, data };
-};
-
-  // Context value
-  
+  // ── Context value ──
   const value = useMemo(
     () => ({
+      // auth
+      user,
+      role,
+      authLoading,
+      signup,
+      login,
+      logout,
+
       // products
       products,
       productsLoading,
       productsError,
-      filteredProducts,
 
       // filters
       filters,
       setFilters,
+      filteredProducts,
 
       // cart
       cartItems,
@@ -671,18 +636,15 @@ const addCategory = useCallback(
       cartCount,
       cartTotal,
 
+      // wishlist
+      wishlist: wishlistItems,
+      wishlistIds,
+      toggleWishlist,
+
       // orders
-      placeOrder,
       orders,
       ordersLoading,
-
-      // authentication
-      user,
-      role,
-      authLoading,
-      signup,
-      login,
-      logout,
+      placeOrder,
 
       // admin
       categories,
@@ -696,41 +658,28 @@ const addCategory = useCallback(
       adminLoading,
       adminError,
 
-      // wishlist (use wishlistItems in components to get correct list based on auth state) 
-
-      wishlistItems,
-      wishlistIds,
-      toggleWishlist,
-
-      // ai search
+      // AI search
       aiSearch,
+      aiImageSearch,
+      aiQuery,
+      aiLoading,
+      aiError,
+      aiResultIds,
+      aiResultsProducts,
+      clearAiResults,
     }),
     [
-      products,
-      productsLoading,
-      productsError,
-      filteredProducts,
-      filters,
-      cartItems,
-      cartCount,
-      cartTotal,
-      placeOrder,
-      orders,
-      ordersLoading,
-      user,
-      role,
-      authLoading,
-      categories,
-      fetchCategories,
-      addCategory,
-      updateCategory,
-      deleteCategory,
-      adminLoading,
-      adminError,
-      wishlistItems,
-      wishlistIds,
-      toggleWishlist,
-    ]
+      user, role, authLoading, signup, login, logout,
+      products, productsLoading, productsError,
+      filters, filteredProducts,
+      cartItems, addToCart, removeFromCart, updateQty, clearCart, cartCount, cartTotal,
+      wishlistItems, wishlistIds, toggleWishlist,
+      orders, ordersLoading, placeOrder,
+      categories, fetchCategories, addCategory, updateCategory, deleteCategory,
+      addProduct, updateProduct, deleteProduct, adminLoading, adminError,
+      aiSearch, aiImageSearch, aiQuery, aiLoading, aiError,
+      aiResultIds, aiResultsProducts, clearAiResults,
+    ],
   );
 
   return <MyContext.Provider value={value}>{children}</MyContext.Provider>;

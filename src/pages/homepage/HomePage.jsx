@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import MyContext from "../../context/data/myContext";
 
 export default function HomePage() {
-  const { aiSearch } = useContext(MyContext);
+  const { aiSearch, aiImageSearch } = useContext(MyContext);
+
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
+
   const navigate = useNavigate();
 
   const onSearch = async (e) => {
@@ -17,34 +20,56 @@ export default function HomePage() {
 
     setLoading(true);
     setErr("");
+    setNote("");
 
     try {
-      const out = await aiSearch(query);
+      const out = await aiSearch(query); // stores results in context
 
-      // your function returns { ok, ... }
-      if (!out || out.ok === false) {
-        setErr(out?.message || "AI search failed.");
+      if (!out?.ok) {
+        setErr(out?.message || "Search failed.");
         return;
       }
 
-      // ✅ IMPORTANT: pass aiQuery so AllProducts uses AI results instead of filters
-      navigate("/products", { state: { aiQuery: query } });
+      navigate("/products"); // no state needed — results live in context
     } catch (e2) {
-      const msg = e2?.message || "Search failed.";
-
-      // Common local dev issue: functions emulator not running / wrong URL
-      if (
-        msg.toLowerCase().includes("failed to fetch") ||
-        msg.toLowerCase().includes("connection refused")
-      ) {
-        setErr(
-          "Could not reach the AI search function. If you're running locally, make sure Firebase emulators are running (functions emulator), then try again."
-        );
-      } else {
-        setErr(msg);
-      }
+      setErr(e2?.message || "Search failed.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onPickImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErr("Please pick an image file.");
+      e.target.value = "";
+      return;
+    }
+
+    setLoading(true);
+    setErr("");
+    setNote("");
+
+    try {
+      const out = await aiImageSearch(file); // stores results in context
+
+      if (!out?.ok) {
+        setErr(out?.message || "Image search failed.");
+        return;
+      }
+
+      if (out?.extractedQuery) {
+        setNote(`Image interpreted as: "${out.extractedQuery}"`);
+      }
+
+      navigate("/products"); // no state needed — results live in context
+    } catch (e2) {
+      setErr(e2?.message || "Image search failed.");
+    } finally {
+      setLoading(false);
+      e.target.value = "";
     }
   };
 
@@ -52,7 +77,7 @@ export default function HomePage() {
     <div style={{ padding: 24 }}>
       <h1>Actually Good Lamps</h1>
       <p style={{ marginTop: 6, opacity: 0.8 }}>
-        Try: “minimalist brass floor lamp under 2000, dimmable”
+        Try: "minimalist brass floor lamp under 2000, dimmable"
       </p>
 
       <form onSubmit={onSearch} style={{ display: "flex", gap: 10, marginTop: 16 }}>
@@ -82,7 +107,22 @@ export default function HomePage() {
         </button>
       </form>
 
-      {err && <p style={{ color: "crimson", marginTop: 10 }}>{err}</p>}
+      <div style={{ marginTop: 14 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 12,
+            opacity: 0.8,
+            marginBottom: 6,
+          }}
+        >
+          Or search by uploading a picture
+        </label>
+        <input type="file" accept="image/*" onChange={onPickImage} disabled={loading} />
+      </div>
+
+      {note && <p style={{ marginTop: 10, color: "green" }}>{note}</p>}
+      {err && <p style={{ marginTop: 10, color: "crimson" }}>{err}</p>}
     </div>
   );
 }
