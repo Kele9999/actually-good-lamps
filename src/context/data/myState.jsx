@@ -14,6 +14,8 @@ import {
 import {
   addDoc,
   collection,
+  where,
+  query,
   deleteDoc,
   doc,
   getDoc,
@@ -120,6 +122,10 @@ export default function MyState({ children }) {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
+  // User order history (for customer role)
+  const [userOrders, setUserOrders] = useState([]);
+  const [userOrdersLoading, setUserOrdersLoading] = useState(false);
+
   // ── Wishlist ──
   const GUEST_WISHLIST_KEY = "agl_guest_wishlist_v1";
   const [guestWishlist, setGuestWishlist] = useState(() => {
@@ -175,6 +181,28 @@ export default function MyState({ children }) {
 
     return () => unsub();
   }, []);
+
+  // ── User orders listener ──
+
+  useEffect(() => {
+  if (!user) { setUserOrders([]); return; }
+
+  setUserOrdersLoading(true);
+  const q = query(
+    collection(db, "orders"),
+    where("userId", "==", user.uid)
+  );
+
+  const unsub = onSnapshot(q, (snap) => {
+    const list = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    setUserOrders(list);
+    setUserOrdersLoading(false);
+  });
+
+  return () => unsub();
+}, [user]);
 
   // ── Wishlist listener ──
   useEffect(() => {
@@ -397,6 +425,21 @@ export default function MyState({ children }) {
       setAiLoading(false);
     }
   }, []);
+
+  const generateProduct = useCallback(async (prompt) => {
+  try {
+    const base = getFunctionsBaseUrl();
+    const res = await fetch(`${base}/generateProduct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json();
+    return data; // { ok: true, product: {...} } or { ok: false, message: "..." }
+  } catch (e) {
+    return { ok: false, message: e?.message || "Network error" };
+  }
+}, []);
 
   // ── Cart actions ──
   const addToCart = useCallback((product, qty = 1) => {
@@ -657,6 +700,7 @@ export default function MyState({ children }) {
       deleteProduct,
       adminLoading,
       adminError,
+      generateProduct,
 
       // AI search
       aiSearch,
@@ -667,6 +711,10 @@ export default function MyState({ children }) {
       aiResultIds,
       aiResultsProducts,
       clearAiResults,
+
+      // user order history
+      userOrders,
+      userOrdersLoading,
     }),
     [
       user, role, authLoading, signup, login, logout,
@@ -678,7 +726,7 @@ export default function MyState({ children }) {
       categories, fetchCategories, addCategory, updateCategory, deleteCategory,
       addProduct, updateProduct, deleteProduct, adminLoading, adminError,
       aiSearch, aiImageSearch, aiQuery, aiLoading, aiError,
-      aiResultIds, aiResultsProducts, clearAiResults,
+      aiResultIds, aiResultsProducts, clearAiResults, userOrders, userOrdersLoading, generateProduct,
     ],
   );
 

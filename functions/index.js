@@ -26,8 +26,9 @@ function enforcePost(req, res) {
 }
 
 function enforceImageSize(imageDataUrl) {
-  const maxSize = 2 * 1024 * 1024; // 2MB
-  const approxBytes = imageDataUrl.length * 0.75;
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  const base64 = imageDataUrl.split(",")[1] || imageDataUrl;
+  const approxBytes = base64.length * 0.75;
   return approxBytes <= maxSize;
 }
 
@@ -206,11 +207,11 @@ exports.aiImageSearch = onRequest(
         const catalog = compactCatalog(products);
 
         const system = `
-Return ONLY valid JSON:
-{ "ids": ["<productId>"], "extractedQuery": "short description" }
-Catalog:
-${JSON.stringify(catalog)}
-`.trim();
+        Return ONLY valid JSON:
+        { "ids": ["<productId>"], "extractedQuery": "short description" }
+        Catalog:
+        ${JSON.stringify(catalog)}
+        `.trim();
 
         const data = await groqChat({
           model: "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -239,6 +240,109 @@ ${JSON.stringify(catalog)}
           ids: cleanIds,
           extractedQuery: parsed?.extractedQuery || query,
         });
+      } catch (e) {
+        return res.status(500).json({ ok: false, message: e.message });
+      }
+    });
+  }
+);
+
+// -------- AI PRODUCT GENERATOR --------
+
+
+exports.generateProduct = onRequest(
+  { secrets: ["GROQ_API_KEY"] },
+  async (req, res) => {
+    corsHandler(req, res, async () => {
+      try {
+        if (!enforcePost(req, res)) return;
+
+        if (!GROQ_API_KEY)
+          return res.status(500).json({ ok: false, message: "Missing GROQ_API_KEY" });
+
+        const { prompt } = req.body || {};
+        if (!prompt || !String(prompt).trim())
+          return res.status(400).json({ ok: false, message: "Missing prompt" });
+
+        // Load categories so the AI can pick a real one
+        const catSnap = await db.collection("categories").get();
+        const categories = catSnap.docs.map((d) => ({ id: d.id, name: d.data().name || "" }));
+
+        const system = `
+You are a product data generator for a premium South African lamp store called "Actually Good Lamps".
+
+Given a short prompt, generate a complete, realistic lamp product listing.
+
+You MUST return ONLY valid JSON — no markdown, no explanation, no backticks.
+
+The JSON must have exactly these fields:
+{
+  "name": "string — creative, premium product name",
+  "description": "string — 2-3 sentences, evocative and luxurious, describing the lamp",
+  "price": number — realistic ZAR retail price (between 500 and 8000),
+  "costPrice": number — realistic ZAR cost price (roughly 40-60% of price),
+  "stock": number — between 3 and 20,
+  "material": "one of: Wood, Brass, Ceramic, Glass, Metal, Rattan, Marble",
+  "lightQuality": "one of: Warm, Neutral, Cool",
+  "features": ["array", "of", "strings", "from: LED, Smart, Dimmable, Halogen, Touch"],
+  "tags": ["array", "of", "2-5", "lowercase", "descriptive", "tags"],
+  "categoryId": "string — pick the most relevant id from the categories list",
+  "categoryName": "string — the matching category name"
+}
+
+Available categories:
+${JSON.stringify(categories)}
+
+Rules:
+- Always pick a real categoryId from the list above
+- Price must be a number, not a string
+- features must be an array (can be empty)
+- tags must be an array of lowercase strings
+- Write the description in a warm, editorial tone — like a luxury interior design magazine
+- Do NOT include imageUrl
+`.trim();
+
+        const data = await groqChat({
+          model: "llama-3.1-8b-instant",
+          temperature: 0.7,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: String(prompt).trim() },
+          ],
+        });
+
+        const content = data?.choices?.[0]?.message?.content || "";
+
+        let parsed;
+        try {
+          parsed = safeJsonFromModel(content);
+        } catch (e) {
+          return res.status(500).json({
+            ok: false,
+            message: "AI returned invalid JSON. Try rephrasing your prompt.",
+            raw: content,
+          });
+        }
+
+        // Validate and sanitise
+        const product = {
+          name:         String(parsed.name         || "").trim(),
+          description:  String(parsed.description  || "").trim(),
+          price:        Number(parsed.price)        || 0,
+          costPrice:    Number(parsed.costPrice)    || 0,
+          stock:        Number(parsed.stock)        || 5,
+          material:     String(parsed.material      || "Metal"),
+          lightQuality: String(parsed.lightQuality  || "Warm"),
+          features:     Array.isArray(parsed.features) ? parsed.features.map(String) : [],
+          tags:         Array.isArray(parsed.tags)     ? parsed.tags.map(String)     : [],
+          categoryId:   String(parsed.categoryId   || ""),
+          categoryName: String(parsed.categoryName || ""),
+        };
+
+        if (!product.name)
+          return res.status(500).json({ ok: false, message: "AI did not return a product name." });
+
+        return res.json({ ok: true, product });
       } catch (e) {
         return res.status(500).json({ ok: false, message: e.message });
       }

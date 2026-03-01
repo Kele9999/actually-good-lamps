@@ -7,11 +7,11 @@ import Layout from "./components/layout/Layout";
 import HomePage from "./pages/homepage/HomePage";
 import AllProducts from "./pages/allproducts/AllProducts";
 import ProductInfo from "./pages/productinfo/ProductInfo";
-import Order from "./pages/order/Order";
 import Cart from "./pages/cart/Cart";
 import Dashboard from "./pages/administrator/dashboard/Dashboard";
 import NoPage from "./pages/nopage/NoPage";
 import Wishlist from "./pages/wishlist/Wishlist";
+import MyOrders from "./pages/myorders/myOrders";
 
 function App() {
 
@@ -27,8 +27,8 @@ function App() {
           <Route path="login" element={<Login />} />
           <Route path="signup" element={<Signup />} />
           <Route path="dashboard"element={<RequireAdmin> <Dashboard /> </RequireAdmin>} />
-          <Route path="order" element={<RequireAuth><Order /></RequireAuth>} />
           <Route path="wishlist" element={<Wishlist />} />
+          <Route path="myorders" element={<MyOrders />} />
         </Route>
       </Routes>
     </Router>
